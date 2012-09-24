@@ -8,7 +8,7 @@
  *
  * Change data removed. See Changes
  *
- * $Id: SSLeay.xs 338 2012-04-05 21:37:24Z mikem-guest $
+ * $Id: SSLeay.xs 347 2012-07-30 11:46:59Z mikem-guest $
  * 
  * The distribution and use of this module are subject to the conditions
  * listed in LICENSE file at the root of OpenSSL-0.9.6b
@@ -21,7 +21,7 @@
  *
  * Function naming conventions:
  *
- * 1/ never change the aready existing function names (all calling convention) in a way
+ * 1/ never change the already existing function names (all calling convention) in a way
  *    that may cause backward incompatibility (e.g. add ALIAS with old name if necessary)
  *
  * 2/ it is recommended to keep the original openssl function names for functions that are:
@@ -53,18 +53,18 @@
  *
  * 2/ Fix all compiler warnings - we expect 100% clean build
  *
- * 3/ If you are gonna add a function which is available since certain openssl version
+ * 3/ If you add a function which is available since certain openssl version
  *    use proper #ifdefs to assure that SSLeay.xs will compile also with older versions
  *    which are missing this function
  *
  * 4/ Even warnings arising from different use of "const" in different openssl versions
  *    needs to be hanled with #ifdefs - see for example: X509_NAME_add_entry_by_txt
  *
- * 5/ avoid using global C variables (it is very likely gonna break thread-safetyness)
+ * 5/ avoid using global C variables (it is very likely to break thread-safetyness)
  *    use rather global MY_CXT structure
  *
  * 6/ avoid using any UNIX/POSIX specific functions, keep in mind that SSLeay.xs must
- *    complile also on non-UNIX platforms like MS Windows and others
+ *    compile also on non-UNIX platforms like MS Windows and others
  *
  * 7/ avoid using c++ comments "//" (or other c++ features accepted by some c compiler)
  *    even if your compiler can handle them without warnings
@@ -76,20 +76,20 @@
  * 2/ it is strongly recommended to create test(s) for newly added function(s), especially
  *    when the new function is not only a 1:1 wrapper but contains a complex code
  *
- * 3/ it is mandatory to add a dcumentation for all newly added functions into SSLeay.pod
- *    otherwise t/local/02_pod_coverage.t is gonna fail (and you will be asked to add
- *    some doc into your patch)
+ * 3/ it is mandatory to add a documentation for all newly added functions into SSLeay.pod
+ *    otherwise t/local/02_pod_coverage.t fail (and you will be asked to add some doc into
+ *    your patch)
  *
- * Prefered code layout:
+ * Preferred code layout:
  *
  * 1/ for simple 1:1 XS wrappers use:
  *
- *    a/ functions whith short "signarute" (short list of args):
+ *    a/ functions with short "signature" (short list of args):
  *
  *    long
  *    SSL_set_tmp_dh(SSL *ssl,DH *dh)
  *
- *    b/ functions whith long "signarute" (long list of args):
+ *    b/ functions with long "signature" (long list of args):
  *       simply when approach a/ does not fit to 120 columns
  *
  *    void
@@ -401,8 +401,8 @@ static void handler_list_md_fn(const EVP_MD *m, const char *from, const char *to
  *    - SSL_CTX_set_default_passwd_cb_userdata
  *    - SSL_set_session_secret_cb
  *
- * If wanna add a new callback:
- * - you vely likely need a new function "your_callback_name_invoke()"
+ * If you want to add a new callback:
+ * - you very likely need a new function "your_callback_name_invoke()"
  * - decide whether your case fits case 1/ or 2/ (and implement likewise existing functions)
  * - try to avoid adding a new style of callback implementation (or ask Net::SSLeay maintainers before)
  *
@@ -737,7 +737,7 @@ int next_proto_helper_AV2protodata(AV * list, unsigned char *out)
         if (out) {
             /* if out == NULL we only calculate the length of output */
             out[ptr] = (unsigned char)len;
-            strncpy(out+ptr+1, p, len);
+            strncpy((char*)out+ptr+1, p, len);
         }
         ptr += strlen(p) + 1;
     }
@@ -806,7 +806,7 @@ int next_proto_select_cb_invoke(SSL *ssl, unsigned char **out, unsigned char *ou
         cb_data_advanced_put(ssl, "next_proto_select_cb!!last_status", newSViv(next_proto_status));
         tmpsv = newSVpv(next_proto_data, next_proto_len);
         cb_data_advanced_put(ssl, "next_proto_select_cb!!last_negotiated", tmpsv);
-        *out = SvPVX(tmpsv);
+        *out = (unsigned char *)SvPVX(tmpsv);
         *outlen = next_proto_len;
         return SSL_TLSEXT_ERR_OK;
     }
@@ -874,7 +874,7 @@ int next_protos_advertised_cb_invoke(SSL *ssl, const unsigned char **out, unsign
         tmpsv = newSVpv(protodata, protodata_len);
         Safefree(protodata);
         cb_data_advanced_put(ssl, "next_protos_advertised_cb!!last_advertised", tmpsv);
-        *out = SvPVX(tmpsv);
+        *out = (unsigned char *)SvPVX(tmpsv);
         *outlen = protodata_len;
         return SSL_TLSEXT_ERR_OK;
     }
@@ -1229,18 +1229,31 @@ int
 SSL_get_fd(s)
      SSL *   s
 
-void
+AV *
 SSL_read(s,max=32768)
 	SSL *   s
 	int     max
-	PREINIT:
+    PREINIT:
 	char *buf;
 	int got;
-	CODE:
+    PPCODE:
 	New(0, buf, max, char);
-	ST(0) = sv_newmortal();   /* Undefined to start with */
-	if ((got = SSL_read(s, buf, max)) >= 0)
-		sv_setpvn( ST(0), buf, got);
+	got = SSL_read(s, buf, max);
+
+	// If in list context, return 2-item list:
+	//   first return value:  data gotten, or undef on error (got<0)
+	//   second return value: result from SSL_read()
+	if (GIMME_V==G_ARRAY) {
+	    EXTEND(SP, 2);
+	    PUSHs(sv_2mortal(got>=0 ? newSVpvn(buf, got) : newSV(0)));
+	    PUSHs(sv_2mortal(newSViv(got)));
+
+	// If in scalar or void context, return data gotten, or undef on error.
+	} else {
+	    EXTEND(SP, 1);
+	    PUSHs(sv_2mortal(got>=0 ? newSVpvn(buf, got) : newSV(0)));
+	}
+
 	Safefree(buf);
 
 void
@@ -1275,9 +1288,10 @@ SSL_write_partial(s,from,count,buf)
      int     from
      int     count
      PREINIT:
-     STRLEN len;
+     STRLEN ulen;
+     IV len;
      INPUT:
-     char *  buf = SvPV( ST(3), len);
+     char *  buf = SvPV( ST(3), ulen);
      CODE:
       /*
      if (SvROK( ST(3) )) {
@@ -1286,14 +1300,15 @@ SSL_write_partial(s,from,count,buf)
      } else
        buf = SvPV( ST(3), len);
        */
-     PR4("write_partial from=%d count=%d len=%d\n",from,count,len);
+     PR4("write_partial from=%d count=%d len=%ul\n",from,count,ulen);
      /*PR2("buf='%s'\n",&buf[from]); / * too noisy */
+     len = (IV)ulen;
      len -= from;
      if (len < 0) {
        croak("from beyound end of buffer");
        RETVAL = -1;
      } else
-       RETVAL = SSL_write (s, &(buf[from]), ((STRLEN)count<=len)?count:len);
+       RETVAL = SSL_write (s, &(buf[from]), (count<=len)?count:len);
      OUTPUT:
      RETVAL
 
@@ -4762,7 +4777,7 @@ P_next_proto_negotiated(s)
         unsigned int len;
     PPCODE:
         SSL_get0_next_proto_negotiated(s, &data, &len);
-        XPUSHs(sv_2mortal(newSVpv(data, len)));
+        XPUSHs(sv_2mortal(newSVpv((char *)data, len)));
 
 void
 P_next_proto_last_status(s)

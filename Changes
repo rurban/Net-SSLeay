@@ -1,5 +1,30 @@
 Revision history for Perl extension Net::SSLeay.
 
+1.49 2012-09-25
+     Fixed problem where on some platforms test t/local/07_tcpecho.t would
+     bail out if it could not bind port 1212. Now now tries a number of ports to bind to until
+     successful.
+     Improvements to  unsigned casting contributed by Reini Urban.
+     Improvements to Net::SSLeay::read to make it easier to use with non-blocking IO:
+      contributed by James Marshall:  It modifies
+      Net::SSLeay::read() to return the result from SSL_read() as the second
+      return value, if Net::SSLeay::read() is called in list context.  Its
+      behavior should be unchanged if called in scalar or void context.  This
+      result code seems to be required for full support of non-blocking I/O,
+      since users need to handle SSL_ERR_WANT_READ, SSL_ERROR_WANT_WRITE, etc.
+      Fixed a problem where t/local/kwalitee.t fails with
+       Module::CPANTS::Analyse 0.86. Patch from Paul.
+      Fixed a number of typos patched by Giles.
+      Fixed a compiler warning from Compiling with gcc-4.4 and -Wall, patched by Giles.	
+      Fixed problems with get_https4: documentation was wrong, $header_ref was
+       not correctly set and $server_cert was not returned.
+      Fixed a problem that could cause a Perl exception about no blength
+      method on undef. Reported by "Stephen J. Smith via RT". https://rt.cpan.org/Ticket/Display.html?id=79309 
+      Added documentation about how to mitigatxe various SSL/TLS
+     vulnerabilities.
+     Fixed problem reported by Mike Doherty: SSL_MODE_* are defined in ssl.h, 
+     and should be available as constants, but I do not see them listed in constants.h
+
 1.48 2012-04-25
      Removed unneeded Debian_CPANTS.txt from MANIFEST.
      Fixed incorrect documentation about the best way to call CTX_set_options.
@@ -432,7 +457,7 @@ Revision history for Perl extension Net::SSLeay.
         - Fixed a bug in SSL_set_tmp_dh
         - Doc improvements in README.Win32
     - Fixed a problem with proxy connections: open_proxy_tcp_connection
-    was stopping after the first \n from teh proxy,
+    was stopping after the first \n from the proxy,
     but instead should have looked for
     $CRLF . $CRLF to find the beginning of the SSL content
     - Fixed missing / on /usr/kerberos/include, reported by several people
