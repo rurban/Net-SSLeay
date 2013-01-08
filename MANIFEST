@@ -46,6 +46,7 @@ ppport.h
 QuickRef
 README
 README.Win32
+README.VMS
 SSLeay.xs
 t/data/binary-test.file
 t/data/cert.pem

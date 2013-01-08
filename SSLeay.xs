@@ -8,7 +8,7 @@
  *
  * Change data removed. See Changes
  *
- * $Id: SSLeay.xs 347 2012-07-30 11:46:59Z mikem-guest $
+ * $Id: SSLeay.xs 363 2012-12-13 19:59:32Z mikem-guest $
  * 
  * The distribution and use of this module are subject to the conditions
  * listed in LICENSE file at the root of OpenSSL-0.9.6b
@@ -171,6 +171,9 @@ which conflicts with perls
 /* requires 0.9.7+ */
 #include <openssl/engine.h>
 #endif
+#ifdef OPENSSL_FIPS
+#include <openssl/fips.h>
+#endif
 #undef BLOCK
 
 /* Debugging output - to enable use:
@@ -202,7 +205,7 @@ typedef struct {
     HV* global_cb_data;
     UV tid;
 } my_cxt_t;
-START_MY_CXT;
+START_MY_CXT
 
 #ifdef USE_ITHREADS
 static perl_mutex LIB_init_mutex;
@@ -213,7 +216,7 @@ static int LIB_initialized;
 UV get_my_thread_id(void) /* returns threads->tid() value */
 {
     dSP;
-    UV tid;
+    UV tid = 0;
     int count = 0;
 
 #ifdef USE_ITHREADS
@@ -248,6 +251,8 @@ UV get_my_thread_id(void) /* returns threads->tid() value */
 
 static void openssl_locking_function(int mode, int type, const char *file, int line)
 {
+    PR3("openssl_locking_function %d %d\n", mode, type);
+
     if (!GLOBAL_openssl_mutex) return;
     if (mode & CRYPTO_LOCK)
       MUTEX_LOCK(&GLOBAL_openssl_mutex[type]);
@@ -312,7 +317,7 @@ void openssl_threads_init(void)
 #else
         if ( !CRYPTO_THREADID_get_callback() ) {
 #endif
-            PR1("openssl_threads_init static locking\n");
+            PR2("openssl_threads_init static locking %d\n", CRYPTO_num_locks());
             New(0, GLOBAL_openssl_mutex, CRYPTO_num_locks(), perl_mutex);
             if (!GLOBAL_openssl_mutex) return;
             for (i=0; i<CRYPTO_num_locks(); i++) MUTEX_INIT(&GLOBAL_openssl_mutex[i]);
@@ -665,6 +670,49 @@ int ssleay_ctx_cert_verify_cb_invoke(X509_STORE_CTX* x509_store_ctx, void* data)
     return res;
 }
 
+#if OPENSSL_VERSION_NUMBER >= 0x0090806fL && !defined(OPENSSL_NO_TLSEXT)
+
+int tlsext_servername_callback_invoke(SSL *ssl, int *ad, void *arg)
+{
+    dSP;
+    int count = -1;
+    int res;
+    SV * cb_func, *cb_data;
+
+    PR1("STARTED: tlsext_servername_callback_invoke\n");
+
+    cb_func = cb_data_advanced_get(arg, "tlsext_servername_callback!!func");
+    cb_data = cb_data_advanced_get(arg, "tlsext_servername_callback!!data");
+
+    if(!SvOK(cb_func))
+        croak ("Net::SSLeay: tlsext_servername_callback_invoke called, but not set to point to any perl function.\n");
+
+    ENTER;
+    SAVETMPS;
+
+    PUSHMARK(SP);
+    XPUSHs(sv_2mortal(newSViv(PTR2IV(ssl))));
+    XPUSHs(sv_2mortal(newSVsv(cb_data)));
+    PUTBACK;
+
+    count = call_sv(cb_func, G_SCALAR);
+
+    SPAGAIN;
+
+    if (count != 1)
+        croak("Net::SSLeay: tlsext_servername_callback_invoke perl function did not return a scalar.\n");
+
+    res = POPi;
+
+    PUTBACK;
+    FREETMPS;
+    LEAVE;
+
+    return res;
+}
+
+#endif
+
 #if defined(SSL_F_SSL_SET_HELLO_EXTENSION) || defined(SSL_F_SSL_SET_SESSION_TICKET_EXT)
 
 int ssleay_session_secret_cb_invoke(SSL* s, void* secret, int *secret_len,
@@ -752,7 +800,7 @@ int next_proto_helper_protodata2AV(AV * list, const unsigned char *in, unsigned 
     while (i<inlen) {
         il = in[i++];
         if (i+il > inlen) return 0;
-        av_push(list, newSVpv(in+i, il));
+        av_push(list, newSVpv((const char*)in+i, il));
         i += il;
     }
     return 1;
@@ -794,17 +842,17 @@ int next_proto_select_cb_invoke(SSL *ssl, unsigned char **out, unsigned char *ou
         SPAGAIN;
         if (count != 2)
             croak ("Net::SSLeay: next_proto_select_cb_invoke perl function did not return 2 values.\n");
-        next_proto_data = POPpx;
+        next_proto_data = (unsigned char*)POPpx;
         next_proto_status = POPi;
         PUTBACK;
         FREETMPS;
         LEAVE;
 
-        if (strlen(next_proto_data)>255) return SSL_TLSEXT_ERR_ALERT_FATAL;
-        next_proto_len = (unsigned char)strlen(next_proto_data);
+        if (strlen((const char*)next_proto_data)>255) return SSL_TLSEXT_ERR_ALERT_FATAL;
+        next_proto_len = strlen((const char*)next_proto_data);
         /* store last_status + last_negotiated into global hash */
         cb_data_advanced_put(ssl, "next_proto_select_cb!!last_status", newSViv(next_proto_status));
-        tmpsv = newSVpv(next_proto_data, next_proto_len);
+        tmpsv = newSVpv((const char*)next_proto_data, next_proto_len);
         cb_data_advanced_put(ssl, "next_proto_select_cb!!last_negotiated", tmpsv);
         *out = (unsigned char *)SvPVX(tmpsv);
         *outlen = next_proto_len;
@@ -820,7 +868,7 @@ int next_proto_select_cb_invoke(SSL *ssl, unsigned char **out, unsigned char *ou
 
         /* store last_status + last_negotiated into global hash */
         cb_data_advanced_put(ssl, "next_proto_select_cb!!last_status", newSViv(next_proto_status));
-        cb_data_advanced_put(ssl, "next_proto_select_cb!!last_negotiated", newSVpv(*out, *outlen));
+        cb_data_advanced_put(ssl, "next_proto_select_cb!!last_negotiated", newSVpv((const char*)*out, *outlen));
         Safefree(next_proto_data);
         return SSL_TLSEXT_ERR_OK;
     }
@@ -871,7 +919,7 @@ int next_protos_advertised_cb_invoke(SSL *ssl, const unsigned char **out, unsign
         if (protodata) next_proto_helper_AV2protodata(tmpav, protodata);
     }    
     if (protodata) {
-        tmpsv = newSVpv(protodata, protodata_len);
+        tmpsv = newSVpv((const char*)protodata, protodata_len);
         Safefree(protodata);
         cb_data_advanced_put(ssl, "next_protos_advertised_cb!!last_advertised", tmpsv);
         *out = (unsigned char *)SvPVX(tmpsv);
@@ -1240,15 +1288,16 @@ SSL_read(s,max=32768)
 	New(0, buf, max, char);
 	got = SSL_read(s, buf, max);
 
-	// If in list context, return 2-item list:
-	//   first return value:  data gotten, or undef on error (got<0)
-	//   second return value: result from SSL_read()
+	/* If in list context, return 2-item list:
+	 *   first return value:  data gotten, or undef on error (got<0)
+	 *   second return value: result from SSL_read()
+	 */
 	if (GIMME_V==G_ARRAY) {
 	    EXTEND(SP, 2);
 	    PUSHs(sv_2mortal(got>=0 ? newSVpvn(buf, got) : newSV(0)));
 	    PUSHs(sv_2mortal(newSViv(got)));
 
-	// If in scalar or void context, return data gotten, or undef on error.
+	/* If in scalar or void context, return data gotten, or undef on error. */
 	} else {
 	    EXTEND(SP, 1);
 	    PUSHs(sv_2mortal(got>=0 ? newSVpvn(buf, got) : newSV(0)));
@@ -1556,9 +1605,15 @@ X509 *
 SSL_get_certificate(s)
      SSL *              s
 
+#if OPENSSL_VERSION_NUMBER >= 0x0090806fL
+#define REM18 "NOTE: requires 0.9.8f+"
+
 SSL_CTX *
 SSL_get_SSL_CTX(s)
      SSL *              s
+
+SSL_CTX *
+SSL_set_SSL_CTX(SSL *ssl, SSL_CTX* ctx)
 
 long
 SSL_ctrl(ssl,cmd,larg,parg)
@@ -1566,6 +1621,8 @@ SSL_ctrl(ssl,cmd,larg,parg)
 	 int cmd
 	 long larg
 	 char * parg
+
+#endif
 
 long
 SSL_CTX_ctrl(ctx,cmd,larg,parg)
@@ -1682,6 +1739,30 @@ SSL_state(s)
 long
 SSL_set_tlsext_host_name(SSL *ssl, const char *name)
 
+const char *
+SSL_get_servername(const SSL *s, int type=TLSEXT_NAMETYPE_host_name) 
+
+int
+SSL_get_servername_type(const SSL *s) 
+
+void
+SSL_CTX_set_tlsext_servername_callback(ctx,callback=&PL_sv_undef,data=&PL_sv_undef)
+        SSL_CTX * ctx
+        SV * callback
+        SV * data
+    CODE:
+    if (callback==NULL || !SvOK(callback)) {
+        SSL_CTX_set_tlsext_servername_callback(ctx, NULL);
+        SSL_CTX_set_tlsext_servername_arg(ctx, NULL);
+        cb_data_advanced_put(ctx, "tlsext_servername_callback!!data", NULL);
+        cb_data_advanced_put(ctx, "tlsext_servername_callback!!func", NULL);
+    } else {
+        cb_data_advanced_put(ctx, "tlsext_servername_callback!!data", newSVsv(data));
+        cb_data_advanced_put(ctx, "tlsext_servername_callback!!func", newSVsv(callback));
+        SSL_CTX_set_tlsext_servername_callback(ctx, &tlsext_servername_callback_invoke);
+        SSL_CTX_set_tlsext_servername_arg(ctx, (void*)ctx);
+    }
+
 #endif
 
 BIO_METHOD *
@@ -1721,6 +1802,30 @@ SSL_load_error_strings()
 
 void
 ERR_load_crypto_strings()
+
+int
+SSL_FIPS_mode_set(int onoff)
+       CODE:
+#ifdef USE_ITHREADS
+               MUTEX_LOCK(&LIB_init_mutex);
+#endif
+#ifdef OPENSSL_FIPS
+               RETVAL = FIPS_mode_set(onoff);
+               if (!RETVAL) 
+	       {
+		   ERR_load_crypto_strings();
+		   ERR_print_errors_fp(stderr);
+               }
+#else
+               RETVAL = 1;
+               fprintf(stderr, "SSL_FIPS_mode_set not available: OpenSSL not compiled with FIPS support\n");
+#endif
+#ifdef USE_ITHREADS
+               MUTEX_UNLOCK(&LIB_init_mutex);
+#endif
+       OUTPUT:
+       RETVAL
+
 
 int
 SSL_library_init()

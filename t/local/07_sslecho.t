@@ -2,11 +2,18 @@
 
 use strict;
 use warnings;
-use Test::More tests => 78;
+use Test::More;
 use Socket;
 use File::Spec;
 use Symbol qw(gensym);
 use Net::SSLeay;
+use Config;
+
+BEGIN {
+  plan skip_all => "fork() not supported on $^O" unless $Config{d_fork};
+}
+
+plan tests => 78;
 
 my $sock;
 my $pid;
@@ -261,12 +268,12 @@ my @results;
 
         my $cn = Net::SSLeay::X509_NAME_get_text_by_NID($subject_name, &Net::SSLeay::NID_commonName);
 
-	my $fingerprint =  Net::SSLeay::X509_get_fingerprint($cert, 'md5');
+	my $fingerprint =  Net::SSLeay::X509_get_fingerprint($cert, 'SHA-1');
 
         push @results, [ $issuer  eq $cert_name, 'cert issuer'  ];
         push @results, [ $subject eq $cert_name, 'cert subject' ];
         push @results, [ substr($cn, length($cn) - 1, 1) ne "\0", 'tailing 0 character is not returned from get_text_by_NID' ];
-        push @results, [ $fingerprint  eq 'AB:56:FB:BD:4E:02:B2:68:AD:F2:C9:6A:2A:7D:DC:BD', 'md5 fingerprint'  ];
+        push @results, [ $fingerprint  eq '96:9F:25:FD:42:A7:FC:4D:8B:FF:14:76:7F:2E:07:AF:F6:A4:10:96', 'SHA-1 fingerprint'  ];
 
         return 1;
     }
