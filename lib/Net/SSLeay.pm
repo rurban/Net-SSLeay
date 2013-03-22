@@ -2,9 +2,9 @@
 #
 # Copyright (c) 1996-2003 Sampo Kellomaki <sampo@iki.fi>, All Rights Reserved.
 # Copyright (C) 2005 Florian Ragwitz <rafl@debian.org>, All Rights Reserved.
-# Copyright (C) 2005 Mike McCauley <mikem@open.com.au>, All Rights Reserved.
+# Copyright (C) 2005 Mike McCauley <mikem@airspayce.com>, All Rights Reserved.
 #
-# $Id: SSLeay.pm 364 2012-12-14 05:36:55Z mikem-guest $
+# $Id: SSLeay.pm 373 2013-03-22 22:11:22Z mikem-guest $
 #
 # Change data removed from here. See Changes
 # The distribution and use of this module are subject to the conditions
@@ -61,7 +61,7 @@ $Net::SSLeay::slowly = 0;
 $Net::SSLeay::random_device = '/dev/urandom';
 $Net::SSLeay::how_random = 512;
 
-$VERSION = '1.52';
+$VERSION = '1.54';
 @ISA = qw(Exporter);
 
 #BEWARE:

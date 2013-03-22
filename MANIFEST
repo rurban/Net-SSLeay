@@ -72,6 +72,8 @@ t/data/testcert_simple.crt.pem
 t/data/testcert_simple.crt.pem_dump
 t/data/testcert_strange.crt.pem
 t/data/testcert_strange.crt.pem_dump
+t/data/testcert_cdp.crt.pem
+t/data/testcert_cdp.crt.pem_dump
 t/data/testreq1.der
 t/data/testreq1.pem
 t/data/verisign.crl.der

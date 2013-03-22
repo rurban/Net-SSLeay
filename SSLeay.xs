@@ -8,7 +8,7 @@
  *
  * Change data removed. See Changes
  *
- * $Id: SSLeay.xs 363 2012-12-13 19:59:32Z mikem-guest $
+ * $Id: SSLeay.xs 368 2013-03-06 23:53:38Z mikem-guest $
  * 
  * The distribution and use of this module are subject to the conditions
  * listed in LICENSE file at the root of OpenSSL-0.9.6b
@@ -2573,7 +2573,10 @@ P_X509_get_crl_distribution_points(cert)
                 gnames = p->distpoint->name.fullname;
                 for (j = 0; j < sk_GENERAL_NAME_num(gnames); j++) {
                     gn = sk_GENERAL_NAME_value(gnames, j);
-                    XPUSHs(sv_2mortal(newSVpv((char*)ASN1_STRING_data(gn->d.ia5),ASN1_STRING_length(gn->d.ia5))));
+
+                    if (gn->type == GEN_URI) {
+                        XPUSHs(sv_2mortal(newSVpv((char*)ASN1_STRING_data(gn->d.ia5),ASN1_STRING_length(gn->d.ia5))));
+                    }
                 }
             }
             else {
@@ -4889,6 +4892,29 @@ P_next_proto_last_status(s)
         const SSL *s
     PPCODE:
         XPUSHs(sv_2mortal(newSVsv(cb_data_advanced_get((void*)s, "next_proto_select_cb!!last_status"))));
+
+#endif
+
+#if OPENSSL_VERSION_NUMBER >= 0x10001000L
+
+void
+SSL_export_keying_material(ssl, outlen, label, p)
+        SSL * ssl
+        int outlen
+    PREINIT:
+        char *  out;
+        STRLEN labellen;
+        STRLEN plen;
+	int ret;
+    INPUT:
+        char *  label = SvPV( ST(2), labellen);
+        char *  p = SvPV( ST(3), plen);
+    PPCODE:
+	New(0, out, outlen, char);
+        ret = SSL_export_keying_material(ssl, out, outlen, label, labellen, p, plen, plen ? 1 : 0);
+        PUSHs(sv_2mortal(ret>=0 ? newSVpvn(out, outlen) : newSV(0)));
+        EXTEND(SP, 1);
+	Safefree(out);
 
 #endif
 
