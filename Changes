@@ -1,5 +1,46 @@
 Revision history for Perl extension Net::SSLeay.
 
+1.56 2014-01-08
+     Fixed a typo in documentaiton of BEAST Attack, patched by gregor
+     herrmann.
+     Added LICENSE file copied form OpenSSL distribution to prevent complaints
+     from various versions of kwalitee.
+     Adjusted license: in META.yml to be 'openssl'
+     Adds support for the basic operations necessary to support ECDH for PFS,
+     e.g. EC_KEY_new_by_curve_name, EC_KEY_free and SSL_CTX_set_tmp_ecdh.
+     Improvements to t/handle/external/50_external.t to handle the case when a
+     test connection was not possible. Patched by Alexandr Ciornii.
+     Added support for ALPN TLS extension. Patch from Lubomir Rintel. Tested
+     with openssl-1.0.2-stable-SNAP-20131205.
+     Fix an use-after-free error. Patch from Lubomir Rintel.
+     Fixed a problem with  Invalid comparison on OBJ_cmp result in
+     t/local/36_verify.t. Contributed by paul.
+     Added support for get_peer_cert_chain(). Patch by Markus Benning.
+     Fixed a bug that could cause stack faults: mixed up PUTBACK with SPAGAIN in ssleay_RSA_generate_key_cb_invoke()
+     a final PUTBACK is needed here. A second issue is also fixed:
+     cb->data defaults to &PL_sv_undef but throught the code you do not check
+     against &PL_sv_undef, just NULL. 
+     To avoid passing the 3rd optional arg at all, do not create it. This fixes all the 
+     cb->data checks and wrong refcounts on &PL_sv_undef. Patched by Reini Urban.
+     Deleted support for SSL_get_tlsa_record_byname: it is not included in
+     OpenSSL git master. 
+
+1.55 2013-06-08
+     Added support for TLSV1_1 and TLSV1_2 methods with SSL_CTX_tlsv1_1_new(),
+     SSL_CTX_tlsv1_2_new(), TLSv1_1_method() and TLSv1_2_method(), where
+     available in the underlying openssl.
+     Added CRL support functions X509_CRL_get_ext(), X509_CRL_get_ext_by_NID(),
+     X509_CRL_get_ext_count(). Patch from Franck Youssef.
+     Fixed a problem which could cause content with a value of '0' to not be
+     correctly encoded by do_httpx3 and friends. Reported by Victor Efimov via
+     RT.
+     Added support for SSL_get_tlsa_record_byname() required for DANE support in
+     openssl-1.0.2 and later. SSL_get_tlsa_record_byname() was added to
+     OpenSSL with the financial assistance of .SE.
+     Testing with openssl-1.0.2-stable-SNAP-20130521.
+     Added X509_NAME_new and X509_NAME_hash, patched by Franck Youssef.
+     Fixed a number of typos in pod file thanks to dsteinbrunner.
+
 1.54 2013-03-23
      t/data/testcert_cdp.crt.pem_dump and t/data/testcert_cdp.crt.pem were
      missing from MANIFEST.

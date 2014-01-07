@@ -9,7 +9,7 @@ configure_requires:
 distribution_type: module
 dynamic_config: 1
 generated_by: 'Module::Install version 1.06'
-license: SSLeay
+license: openssl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
   version: 1.4
@@ -28,4 +28,4 @@ requires:
 resources:
   bugtracker: https://rt.cpan.org/Public/Dist/Display.html?Name=net-ssleay
   repository: http://svn.debian.org/wsvn/net-ssleay
-version: 1.53
+version: 1.56

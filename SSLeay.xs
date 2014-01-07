@@ -8,7 +8,7 @@
  *
  * Change data removed. See Changes
  *
- * $Id: SSLeay.xs 368 2013-03-06 23:53:38Z mikem-guest $
+ * $Id: SSLeay.xs 391 2014-01-07 07:28:35Z mikem-guest $
  * 
  * The distribution and use of this module are subject to the conditions
  * listed in LICENSE file at the root of OpenSSL-0.9.6b
@@ -429,7 +429,7 @@ simple_cb_data_t* simple_cb_data_new(SV* func, SV* data)
         SvREFCNT_inc(func);
         SvREFCNT_inc(data);
         cb->func = func;
-        cb->data = data;
+        cb->data = (data == &PL_sv_undef) ? NULL : data;
     }
     return cb;
 }
@@ -844,19 +844,22 @@ int next_proto_select_cb_invoke(SSL *ssl, unsigned char **out, unsigned char *ou
             croak ("Net::SSLeay: next_proto_select_cb_invoke perl function did not return 2 values.\n");
         next_proto_data = (unsigned char*)POPpx;
         next_proto_status = POPi;
+
+        next_proto_len = strlen((const char*)next_proto_data);
+        if (next_proto_len<=255) {
+          /* store last_status + last_negotiated into global hash */
+          cb_data_advanced_put(ssl, "next_proto_select_cb!!last_status", newSViv(next_proto_status));
+          tmpsv = newSVpv((const char*)next_proto_data, next_proto_len);
+          cb_data_advanced_put(ssl, "next_proto_select_cb!!last_negotiated", tmpsv);
+          *out = (unsigned char *)SvPVX(tmpsv);
+          *outlen = next_proto_len;
+        }
+
         PUTBACK;
         FREETMPS;
         LEAVE;
 
-        if (strlen((const char*)next_proto_data)>255) return SSL_TLSEXT_ERR_ALERT_FATAL;
-        next_proto_len = strlen((const char*)next_proto_data);
-        /* store last_status + last_negotiated into global hash */
-        cb_data_advanced_put(ssl, "next_proto_select_cb!!last_status", newSViv(next_proto_status));
-        tmpsv = newSVpv((const char*)next_proto_data, next_proto_len);
-        cb_data_advanced_put(ssl, "next_proto_select_cb!!last_negotiated", tmpsv);
-        *out = (unsigned char *)SvPVX(tmpsv);
-        *outlen = next_proto_len;
-        return SSL_TLSEXT_ERR_OK;
+        return next_proto_len>255 ? SSL_TLSEXT_ERR_ALERT_FATAL : SSL_TLSEXT_ERR_OK;
     }
     else if (SvROK(cb_data) && (SvTYPE(SvRV(cb_data)) == SVt_PVAV)) {
         next_proto_len = next_proto_helper_AV2protodata((AV*)SvRV(cb_data), NULL);
@@ -925,6 +928,79 @@ int next_protos_advertised_cb_invoke(SSL *ssl, const unsigned char **out, unsign
         *out = (unsigned char *)SvPVX(tmpsv);
         *outlen = protodata_len;
         return SSL_TLSEXT_ERR_OK;
+    }
+    return SSL_TLSEXT_ERR_ALERT_FATAL;
+}
+
+#endif
+
+#if OPENSSL_VERSION_NUMBER >= 0x10002000L && !defined(OPENSSL_NO_TLSEXT)
+
+int alpn_select_cb_invoke(SSL *ssl, const unsigned char **out, unsigned char *outlen,
+                                const unsigned char *in, unsigned int inlen, void *arg)
+{
+    SV *cb_func, *cb_data;
+    unsigned char *alpn_data;
+    unsigned char alpn_len;
+    SSL_CTX *ctx = SSL_get_SSL_CTX(ssl);
+    STRLEN n_a;
+
+    PR1("STARTED: alpn_select_cb_invoke\n");
+    cb_func = cb_data_advanced_get(ctx, "alpn_select_cb!!func");
+    cb_data = cb_data_advanced_get(ctx, "alpn_select_cb!!data");
+
+    if (SvROK(cb_func) && (SvTYPE(SvRV(cb_func)) == SVt_PVCV)) {
+        int count = -1;
+        AV *list = newAV();
+        SV *tmpsv;
+        SV *alpn_data_sv;
+        dSP;
+
+        if (!next_proto_helper_protodata2AV(list, in, inlen)) return SSL_TLSEXT_ERR_ALERT_FATAL;
+
+        ENTER;
+        SAVETMPS;
+        PUSHMARK(SP);
+        XPUSHs(sv_2mortal(newSViv(PTR2IV(ssl))));
+        XPUSHs(sv_2mortal(newRV_inc((SV*)list)));
+        XPUSHs(sv_2mortal(newSVsv(cb_data)));
+        PUTBACK;
+        count = call_sv( cb_func, G_ARRAY );
+        SPAGAIN;
+        if (count != 1)
+            croak ("Net::SSLeay: alpn_select_cb perl function did not return exactly 1 value.\n");
+        alpn_data_sv = POPs;
+        if (SvOK(alpn_data_sv)) {
+          alpn_data = (unsigned char*)SvPVx_nolen(alpn_data_sv);
+          alpn_len = strlen((const char*)alpn_data);
+          if (alpn_len <= 255) {
+            tmpsv = newSVpv((const char*)alpn_data, alpn_len);
+            *out = (unsigned char *)SvPVX(tmpsv);
+            *outlen = alpn_len;
+          }
+        } else {
+          alpn_data = NULL;
+          alpn_len = 0;
+        }
+        PUTBACK;
+        FREETMPS;
+        LEAVE;
+
+        if (alpn_len>255) return SSL_TLSEXT_ERR_ALERT_FATAL;
+        return alpn_data ? SSL_TLSEXT_ERR_OK : SSL_TLSEXT_ERR_NOACK;
+    }
+    else if (SvROK(cb_data) && (SvTYPE(SvRV(cb_data)) == SVt_PVAV)) {
+        int status;
+
+        alpn_len = next_proto_helper_AV2protodata((AV*)SvRV(cb_data), NULL);
+        Newx(alpn_data, alpn_len, unsigned char);
+        if (!alpn_data) return SSL_TLSEXT_ERR_ALERT_FATAL;
+        alpn_len = next_proto_helper_AV2protodata((AV*)SvRV(cb_data), alpn_data);
+
+        /* This is the same function that is used for NPN. */
+        status = SSL_select_next_proto((unsigned char **)out, outlen, in, inlen, alpn_data, alpn_len);
+        Safefree(alpn_data);
+        return status == OPENSSL_NPN_NEGOTIATED ? SSL_TLSEXT_ERR_OK : SSL_TLSEXT_ERR_NOACK;
     }
     return SSL_TLSEXT_ERR_ALERT_FATAL;
 }
@@ -1003,7 +1079,7 @@ void ssleay_RSA_generate_key_cb_invoke(int i, int n, void* data)
             croak ("Net::SSLeay: ssleay_RSA_generate_key_cb_invoke "
                    "perl function did return something in void context.\n");
 
-        PUTBACK;
+        SPAGAIN;
         FREETMPS;
         LEAVE;
     }
@@ -1117,6 +1193,28 @@ SSL_CTX_tlsv1_new()
      RETVAL = SSL_CTX_new (TLSv1_method());
      OUTPUT:
      RETVAL
+
+#ifdef SSL_TXT_TLSV1_1
+
+SSL_CTX *
+SSL_CTX_tlsv1_1_new()
+     CODE:
+     RETVAL = SSL_CTX_new (TLSv1_1_method());
+     OUTPUT:
+     RETVAL
+
+#endif
+
+#ifdef SSL_TXT_TLSV1_2
+
+SSL_CTX *
+SSL_CTX_tlsv1_2_new()
+     CODE:
+     RETVAL = SSL_CTX_new (TLSv1_2_method());
+     OUTPUT:
+     RETVAL
+
+#endif
 
 SSL_CTX *
 SSL_CTX_new_with_method(meth)
@@ -1518,6 +1616,24 @@ SSL_get_shared_ciphers(s,ignored_param1=0,ignored_param2=0)
 X509 *
 SSL_get_peer_certificate(s)
      SSL *              s
+
+void
+SSL_get_peer_cert_chain(s)
+     SSL *              s
+    PREINIT:
+        STACK_OF(X509) *chain = NULL;
+        X509 *x;
+	int i;
+    PPCODE:
+	chain = SSL_get_peer_cert_chain(s);
+	if( chain == NULL ) {
+		return;
+	}
+	for (i=0; i<sk_X509_num(chain); i++) {
+	    x = sk_X509_value(chain, i);
+	    XPUSHs(sv_2mortal(newSViv(PTR2IV(x))));
+	}
+	sk_X509_free(chain);
 
 void
 SSL_set_verify(s,mode,callback)
@@ -2010,6 +2126,12 @@ X509_sign(X509 *x, EVP_PKEY *pkey, const EVP_MD *md)
 
 int
 X509_verify(X509 *x, EVP_PKEY *r)
+
+X509_NAME *
+X509_NAME_new()
+
+unsigned long
+X509_NAME_hash(X509_NAME *name)
 
 void
 X509_NAME_oneline(name)
@@ -2690,6 +2812,20 @@ X509_EXTENSION_get_object(X509_EXTENSION *ex)
 int
 X509_get_ext_count(X509 *x)
 
+int
+X509_CRL_get_ext_count(X509_CRL *x)
+
+int
+X509_CRL_get_ext_by_NID(x,ni,loc=-1)
+        X509_CRL* x
+        int ni
+        int loc
+
+X509_EXTENSION *
+X509_CRL_get_ext(x,loc)
+   X509_CRL* x
+   int loc
+
 void
 X509V3_EXT_print(ext,flags=0,utf8_decode=0)
         X509_EXTENSION * ext
@@ -3361,6 +3497,21 @@ SSLv3_method()
 
 const SSL_METHOD *
 TLSv1_method()
+
+#ifdef SSL_TXT_TLSV1_1
+
+const SSL_METHOD *
+TLSv1_1_method()
+
+#endif
+
+#ifdef SSL_TXT_TLSV1_2
+
+const SSL_METHOD *
+TLSv1_2_method()
+
+#endif
+
 
 #if OPENSSL_VERSION_NUMBER < 0x10000000L
 
@@ -4069,6 +4220,23 @@ long
 SSL_CTX_set_tmp_rsa(ctx,rsa)
      SSL_CTX *	ctx
      RSA *	rsa
+
+#if OPENSSL_VERSION_NUMBER > 0x10000000L
+
+EC_KEY *
+EC_KEY_new_by_curve_name(nid)
+    int nid
+
+void
+EC_KEY_free(key)
+    EC_KEY * key
+
+long
+SSL_CTX_set_tmp_ecdh(ctx,ecdh);
+     SSL_CTX *	ctx
+     EC_KEY  *	ecdh
+
+#endif
 
 void *
 SSL_get_app_data(s)
@@ -4895,6 +5063,98 @@ P_next_proto_last_status(s)
 
 #endif
 
+#if OPENSSL_VERSION_NUMBER >= 0x10002000L && !defined(OPENSSL_NO_TLSEXT)
+
+int
+SSL_CTX_set_alpn_select_cb(ctx,callback,data=&PL_sv_undef)
+        SSL_CTX * ctx
+        SV * callback
+        SV * data
+    CODE:
+        RETVAL = 1;
+        if (callback==NULL || !SvOK(callback)) {
+            SSL_CTX_set_alpn_select_cb(ctx, NULL, NULL);
+            cb_data_advanced_put(ctx, "alpn_select_cb!!func", NULL);
+            cb_data_advanced_put(ctx, "alpn_select_cb!!data", NULL);
+            PR1("SSL_CTX_set_alpn_select_cb - undef\n");
+        }
+        else if (SvROK(callback) && (SvTYPE(SvRV(callback)) == SVt_PVAV)) {
+            /* callback param array ref like ['proto1','proto2'] */
+            cb_data_advanced_put(ctx, "alpn_select_cb!!func", NULL);
+            cb_data_advanced_put(ctx, "alpn_select_cb!!data", newSVsv(callback));
+            SSL_CTX_set_alpn_select_cb(ctx, alpn_select_cb_invoke, ctx);
+            PR2("SSL_CTX_set_alpn_select_cb - simple ctx=%p\n",ctx);
+        }
+        else if (SvROK(callback) && (SvTYPE(SvRV(callback)) == SVt_PVCV)) {
+            cb_data_advanced_put(ctx, "alpn_select_cb!!func", newSVsv(callback));
+            cb_data_advanced_put(ctx, "alpn_select_cb!!data", newSVsv(data));
+            SSL_CTX_set_alpn_select_cb(ctx, alpn_select_cb_invoke, ctx);
+            PR2("SSL_CTX_set_alpn_select_cb - advanced ctx=%p\n",ctx);
+        }
+        else {
+            RETVAL = 0;
+        }
+    OUTPUT:
+        RETVAL
+
+int
+SSL_CTX_set_alpn_protos(ctx,data=&PL_sv_undef)
+        SSL_CTX * ctx
+        SV * data
+    CODE:
+        unsigned char *alpn_data;
+        unsigned char alpn_len;
+
+        RETVAL = -1;
+
+        if (!SvROK(data) || (SvTYPE(SvRV(data)) != SVt_PVAV))
+            croak("Net::SSLeay: CTX_set_alpn_protos needs a single array reference.\n");
+        alpn_len = next_proto_helper_AV2protodata((AV*)SvRV(data), NULL);
+        Newx(alpn_data, alpn_len, unsigned char);
+        if (!alpn_data)
+            croak("Net::SSLeay: CTX_set_alpn_protos could not allocate memory.\n");
+        alpn_len = next_proto_helper_AV2protodata((AV*)SvRV(data), alpn_data);
+        RETVAL = SSL_CTX_set_alpn_protos(ctx, alpn_data, alpn_len);
+        Safefree(alpn_data);
+
+    OUTPUT:
+        RETVAL
+
+int
+SSL_set_alpn_protos(ssl,data=&PL_sv_undef)
+        SSL * ssl
+        SV * data
+    CODE:
+        unsigned char *alpn_data;
+        unsigned char alpn_len;
+
+        RETVAL = -1;
+
+        if (!SvROK(data) || (SvTYPE(SvRV(data)) != SVt_PVAV))
+            croak("Net::SSLeay: set_alpn_protos needs a single array reference.\n");
+        alpn_len = next_proto_helper_AV2protodata((AV*)SvRV(data), NULL);
+        Newx(alpn_data, alpn_len, unsigned char);
+        if (!alpn_data)
+            croak("Net::SSLeay: set_alpn_protos could not allocate memory.\n");
+        alpn_len = next_proto_helper_AV2protodata((AV*)SvRV(data), alpn_data);
+        RETVAL = SSL_set_alpn_protos(ssl, alpn_data, alpn_len);
+        Safefree(alpn_data);
+
+    OUTPUT:
+        RETVAL
+
+void
+P_alpn_selected(s)
+        const SSL *s
+    PREINIT:
+        const unsigned char *data;
+        unsigned int len;
+    PPCODE:
+        SSL_get0_alpn_selected(s, &data, &len);
+        XPUSHs(sv_2mortal(newSVpv((char *)data, len)));
+
+#endif
+
 #if OPENSSL_VERSION_NUMBER >= 0x10001000L
 
 void
@@ -4917,5 +5177,6 @@ SSL_export_keying_material(ssl, outlen, label, p)
 	Safefree(out);
 
 #endif
+
 
 #define REM_EOF "/* EOF - SSLeay.xs */"
