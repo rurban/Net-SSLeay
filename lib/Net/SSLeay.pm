@@ -4,7 +4,7 @@
 # Copyright (C) 2005 Florian Ragwitz <rafl@debian.org>, All Rights Reserved.
 # Copyright (C) 2005 Mike McCauley <mikem@airspayce.com>, All Rights Reserved.
 #
-# $Id: SSLeay.pm 392 2014-01-07 22:10:38Z mikem-guest $
+# $Id: SSLeay.pm 397 2014-01-14 23:27:17Z mikem-guest $
 #
 # Change data removed from here. See Changes
 # The distribution and use of this module are subject to the conditions
@@ -61,7 +61,7 @@ $Net::SSLeay::slowly = 0;
 $Net::SSLeay::random_device = '/dev/urandom';
 $Net::SSLeay::how_random = 512;
 
-$VERSION = '1.56';
+$VERSION = '1.58'; # Dont foget to set verison in META.yml too
 @ISA = qw(Exporter);
 
 #BEWARE:
@@ -1375,3 +1375,4 @@ sub do_https {
 
 1;
 __END__
+

@@ -8,7 +8,7 @@
  *
  * Change data removed. See Changes
  *
- * $Id: SSLeay.xs 391 2014-01-07 07:28:35Z mikem-guest $
+ * $Id: SSLeay.xs 397 2014-01-14 23:27:17Z mikem-guest $
  * 
  * The distribution and use of this module are subject to the conditions
  * listed in LICENSE file at the root of OpenSSL-0.9.6b
@@ -780,8 +780,8 @@ int next_proto_helper_AV2protodata(AV * list, unsigned char *out)
     if (last_index<0) return 0;
     for(i=0; i<=last_index; i++) {
         char *p = SvPV_nolen(*av_fetch(list, i, 0));
-        int len = strlen(p);
-        if (len<0 || len>255) return 0;
+        size_t len = strlen(p);
+        if (len>255) return 0;
         if (out) {
             /* if out == NULL we only calculate the length of output */
             out[ptr] = (unsigned char)len;
@@ -811,7 +811,7 @@ int next_proto_select_cb_invoke(SSL *ssl, unsigned char **out, unsigned char *ou
 {
     SV *cb_func, *cb_data;
     unsigned char *next_proto_data;
-    unsigned char next_proto_len;
+    size_t next_proto_len;
     int next_proto_status;
     SSL_CTX *ctx = SSL_get_SSL_CTX(ssl);
     STRLEN n_a;
@@ -941,7 +941,7 @@ int alpn_select_cb_invoke(SSL *ssl, const unsigned char **out, unsigned char *ou
 {
     SV *cb_func, *cb_data;
     unsigned char *alpn_data;
-    unsigned char alpn_len;
+    size_t alpn_len;
     SSL_CTX *ctx = SSL_get_SSL_CTX(ssl);
     STRLEN n_a;
 
@@ -1010,7 +1010,8 @@ int alpn_select_cb_invoke(SSL *ssl, const unsigned char **out, unsigned char *ou
 int pem_password_cb_invoke(char *buf, int bufsize, int rwflag, void *data) {
     dSP;
     char *str;
-    int count = -1, str_len = 0;
+    int count = -1;
+    size_t str_len = 0;
     simple_cb_data_t* cb = (simple_cb_data_t*)data;
     STRLEN n_a;
 
@@ -1633,7 +1634,6 @@ SSL_get_peer_cert_chain(s)
 	    x = sk_X509_value(chain, i);
 	    XPUSHs(sv_2mortal(newSViv(PTR2IV(x))));
 	}
-	sk_X509_free(chain);
 
 void
 SSL_set_verify(s,mode,callback)
@@ -3252,7 +3252,7 @@ PEM_get_string_PrivateKey(pk,passwd=NULL,enc_alg=NULL)
         BIO *bp;
         int i, n;
         char *buf;
-        int passwd_len = 0;
+        size_t passwd_len = 0;
         pem_password_cb * cb = NULL;
         void * u = NULL;
     CODE:
@@ -4221,7 +4221,7 @@ SSL_CTX_set_tmp_rsa(ctx,rsa)
      SSL_CTX *	ctx
      RSA *	rsa
 
-#if OPENSSL_VERSION_NUMBER > 0x10000000L
+#if OPENSSL_VERSION_NUMBER > 0x10000000L && !defined OPENSSL_NO_EC
 
 EC_KEY *
 EC_KEY_new_by_curve_name(nid)

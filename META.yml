@@ -1,4 +1,5 @@
 ---
+name: Net-SSLeay
 abstract: 'Perl extension for using OpenSSL'
 author:
   - 'Maintained by Mike McCauley and Florian Ragwitz since November 2005'
@@ -13,7 +14,6 @@ license: openssl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
   version: 1.4
-name: Net-SSLeay
 no_index:
   directory:
     - examples
@@ -28,4 +28,4 @@ requires:
 resources:
   bugtracker: https://rt.cpan.org/Public/Dist/Display.html?Name=net-ssleay
   repository: http://svn.debian.org/wsvn/net-ssleay
-version: 1.56
+version: 1.58
