@@ -28,4 +28,4 @@ requires:
 resources:
   bugtracker: https://rt.cpan.org/Public/Dist/Display.html?Name=net-ssleay
   repository: http://svn.debian.org/wsvn/net-ssleay
-version: 1.58
+version: 1.59

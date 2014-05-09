@@ -123,7 +123,6 @@ EOM
         @{ $opts->{lib_links} } = map { $_ =~ s/32\b//g } @{ $opts->{lib_links} } if $Config{use64bitall};
     }
     else {
-        $opts->{optimize} = '-O2 -g';
         push @{ $opts->{lib_links} },
              ($rsaref
               ? qw( ssl crypto RSAglue rsaref z )
@@ -132,7 +131,7 @@ EOM
 
         if (($Config{cc} =~ /aCC/i) && $^O eq 'hpux') {
             print "*** Enabling HPUX aCC options (+e)\n";
-            $opts->{optimize} = '+e '. $opts->{optimize};
+            $opts->{optimize} = '+e -O2 -g';
         }
 
         if ( (($Config{ccname} || $Config{cc}) eq 'gcc') && ($Config{cccdlflags} =~ /-fpic/) ) {

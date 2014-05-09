@@ -4,7 +4,7 @@
 # Copyright (C) 2005 Florian Ragwitz <rafl@debian.org>, All Rights Reserved.
 # Copyright (C) 2005 Mike McCauley <mikem@airspayce.com>, All Rights Reserved.
 #
-# $Id: SSLeay.pm 397 2014-01-14 23:27:17Z mikem-guest $
+# $Id: SSLeay.pm 405 2014-05-09 22:07:07Z mikem-guest $
 #
 # Change data removed from here. See Changes
 # The distribution and use of this module are subject to the conditions
@@ -30,6 +30,8 @@ $Net::SSLeay::trace = 0;  # Do not change here, use
 # 2 = insist on v2 SSL protocol
 # 3 = insist on v3 SSL
 # 10 = insist on TLSv1
+# 11 = insist on TLSv1.1
+# 12 = insist on TLSv1.2
 # 0 or undef = guess (v23)
 #
 $Net::SSLeay::ssl_version = 0;  # don't change here, use
@@ -61,7 +63,7 @@ $Net::SSLeay::slowly = 0;
 $Net::SSLeay::random_device = '/dev/urandom';
 $Net::SSLeay::how_random = 512;
 
-$VERSION = '1.58'; # Dont foget to set verison in META.yml too
+$VERSION = '1.59'; # Dont foget to set verison in META.yml too
 @ISA = qw(Exporter);
 
 #BEWARE:
@@ -337,7 +339,28 @@ $VERSION = '1.58'; # Dont foget to set verison in META.yml too
     use_certificate_ASN1
     use_certificate_file
     write
-
+    d2i_OCSP_RESPONSE
+    i2d_OCSP_RESPONSE
+    OCSP_RESPONSE_free
+    d2i_OCSP_REQUEST
+    i2d_OCSP_REQUEST
+    OCSP_REQUEST_free
+    OCSP_cert2ids
+    OCSP_ids2req
+    OCSP_response_status
+    OCSP_response_status_str
+    OCSP_response_verify
+    OCSP_response_results
+    OCSP_RESPONSE_STATUS_INTERNALERROR
+    OCSP_RESPONSE_STATUS_MALFORMEDREQUEST
+    OCSP_RESPONSE_STATUS_SIGREQUIRED
+    OCSP_RESPONSE_STATUS_SUCCESSFUL
+    OCSP_RESPONSE_STATUS_TRYLATER
+    OCSP_RESPONSE_STATUS_UNAUTHORIZED
+    TLSEXT_STATUSTYPE_ocsp
+    V_OCSP_CERTSTATUS_GOOD
+    V_OCSP_CERTSTATUS_REVOKED
+    V_OCSP_CERTSTATUS_UNKNOWN
 );
 
 sub AUTOLOAD {
@@ -412,8 +435,8 @@ sub die_now {
 # Thanks to Sean Burke for the snippet.
 
 BEGIN{
-eval 'use bytes; sub blength ($) { length $_[0] }';
-$@ and eval '    sub blength ($) { length $_[0] }' ;
+eval 'use bytes; sub blength ($) { defined $_[0] ? length $_[0] : 0  }';
+$@ and eval '    sub blength ($) { defined $_[0] ? length $_[0] : 0 }' ;
 }
 
 # Autoload methods go after __END__, and are processed by the autosplit program.
@@ -911,6 +934,20 @@ sub new_x_ctx {
     }
     elsif ($ssl_version == 3)  { $ctx = CTX_v3_new(); }
     elsif ($ssl_version == 10) { $ctx = CTX_tlsv1_new(); }
+    elsif ($ssl_version == 11) {
+	unless (exists &Net::SSLeay::CTX_tlsv1_1_new) {
+	    warn "ssl_version has been set to 11, but this version of OpenSSL has been compiled without TLSv1.1 support";
+	    return undef;
+	}
+        $ctx = CTX_tlsv1_1_new;
+    }
+    elsif ($ssl_version == 12) {
+	unless (exists &Net::SSLeay::CTX_tlsv1_2_new) {
+	    warn "ssl_version has been set to 12, but this version of OpenSSL has been compiled without TLSv1.2 support";
+	    return undef;
+	}
+        $ctx = CTX_tlsv1_2_new;
+    }
     else                       { $ctx = CTX_new(); }
     return $ctx;
 }
@@ -1287,10 +1324,10 @@ sub do_https3 { splice(@_,1,0) = 1; do_httpx3; }  # Legacy undocumented
 sub do_httpx2 {
     my ($page, $response, $headers, $server_cert) = &do_httpx3;
     X509_free($server_cert) if defined $server_cert;
-    return ($page, $response,
+    return ($page, $response, defined $headers ?
 	    map( { ($h,$v)=/^(\S+)\:\s*(.*)$/; (uc($h),$v); }
 		split(/\s?\n/, $headers)
-		)
+		) : ()
 	    );
 }
 
