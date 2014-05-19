@@ -8,7 +8,7 @@
  *
  * Change data removed. See Changes
  *
- * $Id: SSLeay.xs 407 2014-05-12 07:31:36Z mikem-guest $
+ * $Id: SSLeay.xs 409 2014-05-18 21:20:12Z mikem-guest $
  * 
  * The distribution and use of this module are subject to the conditions
  * listed in LICENSE file at the root of OpenSSL-0.9.6b
@@ -5330,7 +5330,7 @@ i2d_OCSP_RESPONSE(r)
 	STRLEN len;
 	unsigned char *pc,*pi;
 	if (!(len = i2d_OCSP_RESPONSE(r,NULL))) croak("invalid OCSP response");
-	Newx(pc,len,char);
+	Newx(pc,len,unsigned char);
 	if (!pc) croak("out of memory");
 	pi = pc;
 	i2d_OCSP_RESPONSE(r,&pi);
@@ -5363,7 +5363,7 @@ i2d_OCSP_REQUEST(r)
 	STRLEN len;
 	unsigned char *pc,*pi;
 	if (!(len = i2d_OCSP_REQUEST(r,NULL))) croak("invalid OCSP request");
-	pc = Newx(pc,len,char);
+	Newx(pc,len,unsigned char);
 	if (!pc) croak("out of memory");
 	pi = pc;
 	i2d_OCSP_REQUEST(r,&pi);
@@ -5411,7 +5411,7 @@ SSL_OCSP_cert2ids(ssl,...)
 		croak("out of memory for generating OCSO certid");
 	    if (!(len = i2d_OCSP_CERTID(id,NULL)))
 		croak("OCSP certid has no length");
-	    Newx(pc,len,char);
+	    Newx(pc,len,unsigned char);
 	    if (!pc) croak("out of memory");
 	    pi = pc;
 	    i2d_OCSP_CERTID(id,&pi);
@@ -5494,6 +5494,19 @@ SSL_OCSP_response_verify(ssl,rsp,svreq=NULL,flags=0)
 	    }
 	    TRACE(1,"run basic verify");
 	    RETVAL = OCSP_basic_verify(bsr, NULL, store, flags);
+	    if (!RETVAL) {
+		/* some CAs don't add a certificate to their OCSP responses and
+		 * openssl does not include the trusted CA which signed the
+		 * lowest chain certificate when looking for the signer.
+		 * So find this CA ourself and retry verification. */
+		X509 *issuer;
+		X509 *last = sk_X509_value(chain,sk_X509_num(chain)-1);
+		if ( (issuer = find_issuer(last,store,chain))) {
+		    sk_X509_push(bsr->certs,X509_dup(issuer));
+		    TRACE(1,"run OCSP_basic_verify with issuer for last chain element");
+		    RETVAL = OCSP_basic_verify(bsr, NULL, store, flags);
+		}
+	    }
 	}
 	OCSP_BASICRESP_free(bsr);
     OUTPUT:
@@ -5564,7 +5577,7 @@ OCSP_response_results(rsp,...)
 		    unsigned char *pi,*pc;
 		    int len = i2d_OCSP_CERTID(sir->certId,NULL);
 		    if(!len) continue;
-		    Newx(pc,len,char);
+		    Newx(pc,len,unsigned char);
 		    if (!pc) croak("out of memory");
 		    pi = pc;
 		    i2d_OCSP_CERTID(sir->certId,&pi);
