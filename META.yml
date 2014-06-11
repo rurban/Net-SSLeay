@@ -27,5 +27,5 @@ requires:
   perl: 5.005
 resources:
   bugtracker: https://rt.cpan.org/Public/Dist/Display.html?Name=net-ssleay
-  repository: http://svn.debian.org/wsvn/net-ssleay
-version: 1.63
+  repository: svn://svn.debian.org/svn/net-ssleay
+version: 1.64

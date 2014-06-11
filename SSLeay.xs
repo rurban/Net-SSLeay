@@ -8,7 +8,7 @@
  *
  * Change data removed. See Changes
  *
- * $Id: SSLeay.xs 409 2014-05-18 21:20:12Z mikem-guest $
+ * $Id: SSLeay.xs 413 2014-05-28 00:58:52Z mikem-guest $
  * 
  * The distribution and use of this module are subject to the conditions
  * listed in LICENSE file at the root of OpenSSL-0.9.6b
@@ -1818,7 +1818,7 @@ SSL_get_peer_cert_chain(s)
     PPCODE:
 	chain = SSL_get_peer_cert_chain(s);
 	if( chain == NULL ) {
-		return;
+	    XSRETURN_EMPTY;
 	}
 	for (i=0; i<sk_X509_num(chain); i++) {
 	    x = sk_X509_value(chain, i);
