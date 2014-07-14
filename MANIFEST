@@ -2,7 +2,6 @@ Changes
 constants.c
 Credits
 LICENSE
-Debian_CPANTS.txt
 examples/bio.pl
 examples/bulk.pl
 examples/callback.pl
@@ -109,6 +108,7 @@ t/local/38_priv-key.t
 t/local/39_pkcs12.t
 t/local/40_npn_support.t
 t/local/41_alpn_support.t
+t/local/42_info_callback.t
 t/local/50_digest.t
 t/local/61_threads-cb-crash.t
 t/local/62_threads-ctx_new-deadlock.t
