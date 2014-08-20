@@ -4,12 +4,12 @@
 # Copyright (C) 2005 Florian Ragwitz <rafl@debian.org>, All Rights Reserved.
 # Copyright (C) 2005 Mike McCauley <mikem@airspayce.com>, All Rights Reserved.
 #
-# $Id: SSLeay.pm 422 2014-07-14 10:09:13Z mikem-guest $
+# $Id: SSLeay.pm 426 2014-08-21 01:08:36Z mikem-guest $
 #
 # Change data removed from here. See Changes
 # The distribution and use of this module are subject to the conditions
-# listed in LICENSE file at the root of OpenSSL-0.9.7b
-# distribution (i.e. free, but mandatory attribution and NO WARRANTY).
+# listed in LICENSE file at the root of the Net-SSLeay
+# distribution (i.e. same license as Perl itself).
 
 package Net::SSLeay;
 
@@ -63,7 +63,7 @@ $Net::SSLeay::slowly = 0;
 $Net::SSLeay::random_device = '/dev/urandom';
 $Net::SSLeay::how_random = 512;
 
-$VERSION = '1.65'; # Dont forget to set version in META.yml too
+$VERSION = '1.66'; # Dont forget to set version in META.yml too
 @ISA = qw(Exporter);
 
 #BEWARE:
@@ -481,7 +481,7 @@ sub open_tcp_connection {
     warn "Opening connection to $dest_serv:$port (" .
 	inet_ntoa($dest_serv_ip) . ")" if $trace>2;
 
-    my $proto = Socket::IPPROTO_TCP; # getprotobyname('tcp') not available on android
+    my $proto = &Socket::IPPROTO_TCP; # getprotobyname('tcp') not available on android
     if (socket (SSLCAT_S, &PF_INET(), &SOCK_STREAM(), $proto)) {
         warn "next connect" if $trace>3;
         if (CORE::connect (SSLCAT_S, $sin)) {
