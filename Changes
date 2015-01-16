@@ -1,5 +1,25 @@
 Revision history for Perl extension Net::SSLeay.
 
+1.67 2015-01-17
+     Improvements to inc/Module/Install/PRIVATE/Net/SSLeay.pm to handle the
+     case whe there are muliple OPENSSLs installed. Patch from HBRAND
+     Fixed a documentation error in get_peer_cert_chain, reported by tejas.
+     Fixed a problem with building on Windows that prevented correct OpenSSL
+     directory detection with version 1.0.1j as delivered with Shining Light OpenSSL.
+     Fixed a problem with building on Windows that prevented finding MT or MD
+     versions of SSL libraries.
+     Updated doc in README.Win32 to build with Microsoft Visual Studio 2010 Express.
+     Added Windows crypt32 library to Windows linking as some compilers/platforms seem to
+     require it and it is innocuous otherwise. For Steve Hay.
+     Fixed a failure in t/external/20_cert_chain.t where some platforms do not
+     have HTTPS in /etc/services. Reported and patched by Gisle Aas.
+     Recent 1.0.2 betas have dropped the SSLv3_method function. 
+     This patch leaves out the function on newer versions, much the same as
+     the SSLv2 deprecation is handled. Patch from Tom Molesworth.
+     Fix the ALPN test, which was incorrectly failing on OpenSSL due to the
+     LibreSSL check (earlier versions bailed out before that line).Patch from
+     Tom Molesworth. 
+
 1.66 2014-08-21
      Fixed compile problem with perl prior to 5.8.8, similar to
      RT#76267. Reported by Graham Knop.

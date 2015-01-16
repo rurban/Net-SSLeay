@@ -8,7 +8,7 @@
  *
  * Change data removed. See Changes
  *
- * $Id: SSLeay.xs 426 2014-08-21 01:08:36Z mikem-guest $
+ * $Id: SSLeay.xs,v 1.9 2015/01/16 22:19:22 mikem Exp mikem $
  * 
  * The distribution and use of this module are subject to the conditions
  * listed in LICENSE file at the root of the Net-SSLeay
@@ -1413,12 +1413,18 @@ SSL_CTX_v2_new()
 #endif
 #endif
 
+#ifndef OPENSSL_NO_SSL3
+#if OPENSSL_VERSION_NUMBER < 0x10002000L
+
 SSL_CTX *
 SSL_CTX_v3_new()
      CODE:
      RETVAL = SSL_CTX_new (SSLv3_method());
      OUTPUT:
      RETVAL
+
+#endif
+#endif
 
 SSL_CTX *
 SSL_CTX_v23_new()
@@ -3762,8 +3768,14 @@ SSLv2_method()
 #endif
 #endif
 
+#ifndef OPENSSL_NO_SSL3
+#if OPENSSL_VERSION_NUMBER < 0x10002000L
+
 const SSL_METHOD *
 SSLv3_method()
+
+#endif
+#endif
 
 const SSL_METHOD *
 TLSv1_method()
