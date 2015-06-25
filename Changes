@@ -1,5 +1,24 @@
 Revision history for Perl extension Net::SSLeay.
 
+1.70 2015-06-26
+     Patch from Alexander Bluhm: The new OpenSSL 1.0.2 X509_check_* functions are not available in
+     current LibreSSL.  So disable them in SSLeay.xs.
+     Fixed a problem with building against OSX homebrew's openssl. Patch from
+     Shoichi Kaji.
+     Removed a test in t/local/33_x509_create_cert.t which fails due to
+     changes in 1.0.1n and later
+
+1.69 2015-06-04
+     Testing with OpenSSL 1.0.2, 1.0.2a. OK.
+     Completed LibreSSL compatibility with the kind assistance of Alexander
+     Bluhm.
+     Improved compatibility with OpenSSL 1.0.2a as suggested by Petr Pisar.
+     Added the X509_check_* functions introduced in OpenSSL 1.0.2, contributed
+     by Carsten Gaebler.
+     Added support for X509_V_FLAG_TRUSTED_FIRST constant, patch from Gisle Aas.
+     Patch allows get_keyblock_size to work correctly with 
+     OpenSSL 1.0.1 and later versions. Contributed by Heikki Vatiainen.
+
 1.68 2015-01-24
      Fixed a problem on OSX when macports openssl 1.x is installed: headers from
      macport were found but older OSX openssl libraries were linked, resulting

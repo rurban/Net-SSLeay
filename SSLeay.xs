@@ -8,7 +8,7 @@
  *
  * Change data removed. See Changes
  *
- * $Id: SSLeay.xs,v 1.10 2015/01/23 20:59:15 mikem Exp mikem $
+ * $Id: SSLeay.xs 446 2015-06-05 22:10:13Z mikem-guest $
  * 
  * The distribution and use of this module are subject to the conditions
  * listed in LICENSE file at the root of the Net-SSLeay
@@ -1401,7 +1401,6 @@ SSL_CTX_new()
      RETVAL
 
 #ifndef OPENSSL_NO_SSL2
-#if OPENSSL_VERSION_NUMBER < 0x10000000L
 
 SSL_CTX *
 SSL_CTX_v2_new()
@@ -1411,10 +1410,8 @@ SSL_CTX_v2_new()
      RETVAL
 
 #endif
-#endif
 
 #ifndef OPENSSL_NO_SSL3
-#if OPENSSL_VERSION_NUMBER < 0x10002000L
 
 SSL_CTX *
 SSL_CTX_v3_new()
@@ -1423,7 +1420,6 @@ SSL_CTX_v3_new()
      OUTPUT:
      RETVAL
 
-#endif
 #endif
 
 SSL_CTX *
@@ -2335,6 +2331,45 @@ RAND_write_file(file_name)
      char *  file_name
 
 #define REM40 "Minimal X509 stuff..., this is a bit ugly and should be put in its own modules Net::SSLeay::X509.pm"
+
+#if OPENSSL_VERSION_NUMBER >= 0x1000200fL && !defined(LIBRESSL_VERSION_NUMBER)
+
+int
+X509_check_host(X509 *cert, const char *name, unsigned int flags = 0, SV *peername = &PL_sv_undef)
+    INIT:
+        char *c_peername = NULL;
+    CODE:
+        RETVAL = X509_check_host(cert, name, 0, flags, (items == 4) ? &c_peername : NULL);
+        if (items == 4)
+            sv_setpv(peername, c_peername);
+    OUTPUT:
+        RETVAL
+    CLEANUP:
+        if (c_peername)
+            OPENSSL_free(c_peername);
+
+int
+X509_check_email(X509 *cert, const char *address, unsigned int flags = 0)
+    CODE:
+        RETVAL = X509_check_email(cert, address, 0, flags);
+    OUTPUT:
+        RETVAL
+
+int
+X509_check_ip(X509 *cert, SV *address, unsigned int flags = 0)
+    INIT:
+        unsigned char *c_address;
+        size_t addresslen;
+    CODE:
+        c_address = SvPV(address, addresslen);
+        RETVAL = X509_check_ip(cert, c_address, addresslen, flags);
+    OUTPUT:
+        RETVAL
+
+int
+X509_check_ip_asc(X509 *cert, const char *address, unsigned int flags = 0)
+
+#endif
 
 X509_NAME*
 X509_get_issuer_name(cert)
@@ -4853,16 +4888,22 @@ SSL_get_keyblock_size(s)
      {
 	const EVP_CIPHER *c;
 	const EVP_MD *h;
+	int md_size = -1;
 	c = s->enc_read_ctx->cipher;
-#if OPENSSL_VERSION_NUMBER >= 0x00909000L
+#if OPENSSL_VERSION_NUMBER >= 0x10001000L
+	if (s->s3)
+	    md_size = s->s3->tmp.new_mac_secret_size;
+#elif OPENSSL_VERSION_NUMBER >= 0x00909000L
 	h = EVP_MD_CTX_md(s->read_hash);
+	md_size = EVP_MD_size(h);
 #else
 	h = s->read_hash;
+	md_size = EVP_MD_size(h);
 #endif
-
-	RETVAL = 2 * (EVP_CIPHER_key_length(c) +
-		    EVP_MD_size(h) +
-		    EVP_CIPHER_iv_length(c));
+	RETVAL = (md_size > 0) ? (2 * (EVP_CIPHER_key_length(c) +
+				       md_size +
+				       EVP_CIPHER_iv_length(c)))
+			       : -1;
      }
      OUTPUT:
      RETVAL
@@ -5773,7 +5814,7 @@ OCSP_response_results(rsp,...)
 
 #endif
 
-#if OPENSSL_VERSION_NUMBER >= 0x10002000L && !defined(OPENSSL_NO_TLSEXT) && !defined(LIBRESSL_VERSION_NUMBER)
+#if OPENSSL_VERSION_NUMBER >= 0x10002000L && !defined(OPENSSL_NO_TLSEXT)
 
 int
 SSL_CTX_set_alpn_select_cb(ctx,callback,data=&PL_sv_undef)
