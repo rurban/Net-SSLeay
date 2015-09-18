@@ -8,7 +8,7 @@
  *
  * Change data removed. See Changes
  *
- * $Id: SSLeay.xs 446 2015-06-05 22:10:13Z mikem-guest $
+ * $Id: SSLeay.xs 452 2015-08-20 03:48:44Z mikem-guest $
  * 
  * The distribution and use of this module are subject to the conditions
  * listed in LICENSE file at the root of the Net-SSLeay
@@ -170,8 +170,12 @@ which conflicts with perls
 #ifndef OPENSSL_NO_MD2
 #include <openssl/md2.h>
 #endif
+#ifndef OPENSSL_NO_MD4
 #include <openssl/md4.h>
+#endif
+#ifndef OPENSSL_NO_MD5
 #include <openssl/md5.h>     /* openssl-SNAP-20020227 does not automatically include this */
+#endif
 #if OPENSSL_VERSION_NUMBER >= 0x00905000L
 #include <openssl/ripemd.h>
 #endif
@@ -2336,7 +2340,7 @@ RAND_write_file(file_name)
 
 int
 X509_check_host(X509 *cert, const char *name, unsigned int flags = 0, SV *peername = &PL_sv_undef)
-    INIT:
+    PREINIT:
         char *c_peername = NULL;
     CODE:
         RETVAL = X509_check_host(cert, name, 0, flags, (items == 4) ? &c_peername : NULL);
@@ -2357,7 +2361,7 @@ X509_check_email(X509 *cert, const char *address, unsigned int flags = 0)
 
 int
 X509_check_ip(X509 *cert, SV *address, unsigned int flags = 0)
-    INIT:
+    PREINIT:
         unsigned char *c_address;
         size_t addresslen;
     CODE:
@@ -2864,9 +2868,11 @@ X509_get_fingerprint(cert,type)
 		unsigned int dsz, k = 0;
 		char text[EVP_MAX_MD_SIZE * 3 + 1];
 	CODE:
+#ifndef OPENSSL_NO_MD5
 		if (!k && !strcmp(type,"md5")) {
 		 	k = 1; digest_tp = EVP_md5();
 		}
+#endif
 		if (!k && !strcmp(type,"sha1")) {
 			k = 1; digest_tp = EVP_sha1();
 		}
@@ -3696,6 +3702,8 @@ MD2(data)
 
 #endif
 
+#ifndef OPENSSL_NO_MD4
+
 void
 MD4(data)
 	PREINIT:
@@ -3710,6 +3718,10 @@ MD4(data)
 		XSRETURN_UNDEF;
 	}
 
+#endif
+
+#ifndef OPENSSL_NO_MD5
+
 void
 MD5(data)
      PREINIT:
@@ -3723,6 +3735,8 @@ MD5(data)
      } else {
 	  XSRETURN_UNDEF;
      }
+
+#endif
 
 #if OPENSSL_VERSION_NUMBER >= 0x00905000L
 
@@ -5852,10 +5866,11 @@ int
 SSL_CTX_set_alpn_protos(ctx,data=&PL_sv_undef)
         SSL_CTX * ctx
         SV * data
-    CODE:
+    PREINIT:
         unsigned char *alpn_data;
         unsigned char alpn_len;
 
+    CODE:
         RETVAL = -1;
 
         if (!SvROK(data) || (SvTYPE(SvRV(data)) != SVt_PVAV))
@@ -5875,10 +5890,11 @@ int
 SSL_set_alpn_protos(ssl,data=&PL_sv_undef)
         SSL * ssl
         SV * data
-    CODE:
+    PREINIT:
         unsigned char *alpn_data;
         unsigned char alpn_len;
 
+    CODE:
         RETVAL = -1;
 
         if (!SvROK(data) || (SvTYPE(SvRV(data)) != SVt_PVAV))
