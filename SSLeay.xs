@@ -8,7 +8,7 @@
  *
  * Change data removed. See Changes
  *
- * $Id: SSLeay.xs 456 2015-09-21 21:51:26Z mikem-guest $
+ * $Id: SSLeay.xs 458 2015-12-15 21:23:48Z mikem-guest $
  * 
  * The distribution and use of this module are subject to the conditions
  * listed in LICENSE file at the root of the Net-SSLeay
@@ -5393,6 +5393,23 @@ P_X509_get_pubkey_alg(x)
         RETVAL = (x->cert_info->key->algor->algorithm);
     OUTPUT:
         RETVAL
+
+void
+X509_get_X509_PUBKEY(x)
+   const X509 *x
+   PPCODE:
+   X509_PUBKEY *pkey;
+   STRLEN len;
+   unsigned char *pc, *pi;
+   if (!(pkey = X509_get_X509_PUBKEY(x))) croak("invalid certificate");
+   if (!(len = i2d_X509_PUBKEY(pkey, NULL))) croak("invalid certificate public key");
+   Newx(pc,len,unsigned char);
+   if (!pc) croak("out of memory");
+   pi = pc;
+   i2d_X509_PUBKEY(pkey, &pi);
+   if (pi-pc != len) croak("invalid encoded length");
+   XPUSHs(sv_2mortal(newSVpv((char*)pc,len)));
+   Safefree(pc);
 
 #if OPENSSL_VERSION_NUMBER >= 0x10001000L && !defined(OPENSSL_NO_NEXTPROTONEG)
 

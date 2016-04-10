@@ -1,5 +1,5 @@
 README - Net::SSLeay Perl module for using OpenSSL
-$Id: README 435 2015-02-14 21:57:30Z mikem-guest $
+$Id: README 461 2016-04-04 03:32:38Z mikem-guest $
 
 By popular demand...
 --------------------
@@ -46,6 +46,12 @@ Unix:
 	make test            # Run the test suite
 	make install         # You probably have to su to root to do this
 
+	If your OpenSSL is installed in an unusual place, you can tell
+	Net-SSLeay where to find it with the OPENSSL_PREFIX environment
+	variable:
+	OPENSSL_PREFIX=/home/mikem/playpen/openssl-1.0.2c perl Makefile.PL
+	....
+
 HPUX:
 	In principle the Unix build should work (Makefile.PL contains
 	special code to detect aCC), but historically there have been
@@ -71,6 +77,9 @@ Windows:
 	Supported on 32 and 64 bit platforms
 	See README.Win32 for details
 
+OS X:
+	See README.OSX
+---------------------------------	
 You should also be able to use CPAN.pm to install this module if you like.
 
 Linking with RSAref is no longer supported (the patent issue is moot
