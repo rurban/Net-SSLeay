@@ -8,7 +8,7 @@
  *
  * Change data removed. See Changes
  *
- * $Id: SSLeay.xs 470 2016-07-15 06:35:44Z mikem-guest $
+ * $Id: SSLeay.xs 477 2016-07-31 20:24:00Z mikem-guest $
  * 
  * The distribution and use of this module are subject to the conditions
  * listed in LICENSE file at the root of the Net-SSLeay
@@ -1312,7 +1312,7 @@ int tlsext_ticket_key_cb_invoke(
 	RAND_bytes(iv, 16);
 	EVP_EncryptInit_ex(ectx, EVP_aes_128_cbc(), NULL, key, iv);
 	HMAC_Init_ex(hctx,key+16,16,EVP_sha256(),NULL);
-	memset(key_name, 0, sizeof(key_name));
+	memset(key_name, 0, 16);
 	memcpy(key_name,name,svlen);
 	return 1;
     } else {
