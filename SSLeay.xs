@@ -8,7 +8,7 @@
  *
  * Change data removed. See Changes
  *
- * $Id: SSLeay.xs 478 2016-08-12 23:53:46Z mikem-guest $
+ * $Id: SSLeay.xs 481 2016-10-20 01:32:57Z mikem-guest $
  * 
  * The distribution and use of this module are subject to the conditions
  * listed in LICENSE file at the root of the Net-SSLeay
@@ -166,7 +166,9 @@ which conflicts with perls
 #include <openssl/buffer.h>
 #include <openssl/ssl.h>
 #include <openssl/pkcs12.h>
+#ifndef OPENSSL_NO_COMP
 #include <openssl/comp.h>    /* openssl-0.9.6a forgets to include this */
+#endif
 #ifndef OPENSSL_NO_MD2
 #include <openssl/md2.h>
 #endif
@@ -1438,6 +1440,13 @@ X509 * find_issuer(X509 *cert,X509_STORE *store, STACK_OF(X509) *chain) {
 	if (stx) X509_STORE_CTX_free(stx);
     }
     return issuer;
+}
+
+SV* bn2sv(BIGNUM* p_bn)
+{
+    return p_bn != NULL
+        ? sv_2mortal(newSViv((IV) BN_dup(p_bn)))
+        : &PL_sv_undef;
 }
 
 /* ============= end of helper functions ============== */
@@ -4146,10 +4155,14 @@ SSL_CIPHER_get_bits(c,alg_bits=NULL)
 
 #endif
 
+#ifndef OPENSSL_NO_COMP
+
 int
 SSL_COMP_add_compression_method(id,cm)
      int 	id
      COMP_METHOD *	cm
+
+#endif
 
 int
 SSL_CTX_add_client_CA(ctx,x)
@@ -4956,6 +4969,26 @@ RSA_generate_key(bits,e,perl_cb=&PL_sv_undef,perl_data=&PL_sv_undef)
         simple_cb_data_free(cb);
     OUTPUT:
         RETVAL
+
+#endif
+
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+
+void
+RSA_get_key_parameters(rsa)
+	    RSA * rsa
+PPCODE:
+{
+    /* Caution: returned list consists of SV pointers to BIGNUMs, which would need to be blessed as Crypt::OpenSSL::Bignum for further use */
+    XPUSHs(bn2sv(rsa->n));
+    XPUSHs(bn2sv(rsa->e));
+    XPUSHs(bn2sv(rsa->d));
+    XPUSHs(bn2sv(rsa->p));
+    XPUSHs(bn2sv(rsa->q));
+    XPUSHs(bn2sv(rsa->dmp1));
+    XPUSHs(bn2sv(rsa->dmq1));
+    XPUSHs(bn2sv(rsa->iqmp));
+}
 
 #endif
 
@@ -6043,6 +6076,8 @@ OCSP_response_results(rsp,...)
 	    OCSP_SINGLERESP *sir = NULL;
 	    OCSP_CERTID *certid = NULL;
 	    SV *idsv = NULL;
+	    int first, status, revocationReason;
+	    ASN1_GENERALIZEDTIME *revocationTime, *thisupdate, *nextupdate;
 
 	    if(getall) {
 		sir = OCSP_resp_get0(bsr,i);
@@ -6057,13 +6092,11 @@ OCSP_response_results(rsp,...)
 		    error = "failed to get OCSP certid from string";
 		    goto end;
 		}
-                int first = OCSP_resp_find(bsr, certid, -1); /* Find the first matching */
+                first = OCSP_resp_find(bsr, certid, -1); /* Find the first matching */
                 if (first >= 0)
                     sir = OCSP_resp_get0(bsr,first);
 	    }
 
-	    int status, revocationReason;   
-	    ASN1_GENERALIZEDTIME *revocationTime, *thisupdate, *nextupdate;
 	    if (sir)
 	    {
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
