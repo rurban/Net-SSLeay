@@ -8,7 +8,7 @@
  *
  * Change data removed. See Changes
  *
- * $Id: SSLeay.xs 484 2017-01-04 21:39:08Z mikem-guest $
+ * $Id: SSLeay.xs 493 2017-03-03 09:19:46Z mikem-guest $
  * 
  * The distribution and use of this module are subject to the conditions
  * listed in LICENSE file at the root of the Net-SSLeay
@@ -185,7 +185,9 @@ which conflicts with perls
 #include <openssl/x509v3.h>
 #if OPENSSL_VERSION_NUMBER >= 0x0090700fL
 /* requires 0.9.7+ */
+#ifndef OPENSSL_NO_ENGINE
 #include <openssl/engine.h>
+#endif
 #endif
 #ifdef OPENSSL_FIPS
 #include <openssl/fips.h>
@@ -259,11 +261,14 @@ UV get_my_thread_id(void) /* returns threads->tid() value */
     PUTBACK;
     count = call_method("tid", G_SCALAR|G_EVAL);
     SPAGAIN;
+    /* Caution: recent perls do not appear support threads->tid() */
     if (SvTRUE(ERRSV) || count != 1)
-       /* if threads not loaded or an error occurs return 0 */
-       tid = 0;
+    {
+      /* if compatible threads not loaded or an error occurs return 0 */
+      tid = 0;
+    }
     else
-       tid = (UV)POPi;
+      tid = (UV)POPi;
     PUTBACK;
     FREETMPS;
     LEAVE;
@@ -3120,6 +3125,7 @@ X509_get_subjectAltNames(cert)
 
                      }
 		}
+		sk_GENERAL_NAME_pop_free(subjAltNameDNs, GENERAL_NAME_free);
 	}
 	XSRETURN(count * 2);
 
@@ -4989,7 +4995,7 @@ RSA_generate_key(bits,e,perl_cb=&PL_sv_undef,perl_data=&PL_sv_undef)
 
 #endif
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 
 void
 RSA_get_key_parameters(rsa)
