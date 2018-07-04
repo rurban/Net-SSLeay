@@ -8,7 +8,7 @@
  *
  * Change data removed. See Changes
  *
- * $Id: SSLeay.xs 518 2018-01-27 20:43:03Z mikem-guest $
+ * $Id$
  * 
  * The distribution and use of this module are subject to the conditions
  * listed in LICENSE file at the root of the Net-SSLeay
