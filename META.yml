@@ -29,4 +29,4 @@ resources:
   bugtracker: https://rt.cpan.org/Public/Dist/Display.html?Name=net-ssleay
   license: http://dev.perl.org/licenses/
   repository: https://github.com/radiator-software/p5-net-ssleay
-version: 1.86_01
+version: 1.86_02
