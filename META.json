@@ -4,7 +4,7 @@
       "Originally written by Sampo KellomÃ¤ki"
    ],
    "dynamic_config" : 0,
-   "generated_by" : "ExtUtils::MakeMaker version 7.34, CPAN::Meta::Converter version 2.150010",
+   "generated_by" : "ExtUtils::MakeMaker version 7.0401, CPAN::Meta::Converter version 2.150001",
    "license" : [
       "perl_5"
    ],
@@ -49,7 +49,7 @@
          }
       }
    },
-   "release_status" : "unstable",
+   "release_status" : "testing",
    "resources" : {
       "bugtracker" : {
          "web" : "https://rt.cpan.org/Public/Dist/Display.html?Name=net-ssleay"
@@ -62,6 +62,5 @@
          "web" : "https://github.com/radiator-software/p5-net-ssleay"
       }
    },
-   "version" : "1.86_03",
-   "x_serialization_backend" : "JSON::PP version 2.27400_02"
+   "version" : "1.86_04"
 }
