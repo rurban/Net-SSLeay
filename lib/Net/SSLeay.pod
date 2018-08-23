@@ -3810,7 +3810,22 @@ Returns a function pointer to the TLS/SSL method set in $ssl.
 
 Check openssl doc L<http://www.openssl.org/docs/ssl/SSL_CTX_set_ssl_version.html|http://www.openssl.org/docs/ssl/SSL_CTX_set_ssl_version.html>
 
+=item * in_init, in_before, is_init_finished, in_connect_init, in_accept_init
+
+B<COMPATIBILITY:> not available in Net-SSLeay-1.85 and before.
+
+Retrieve information about the handshake state machine. All functions take $ssl as the only argument and return 0 or 1. These functions are recommended over get_state() and state().
+
+ my $rv = Net::SSLeay::is_init_finished($ssl);
+ # $ssl - value corresponding to openssl's SSL structure
+ #
+ # returns: All functions return 1 or 0
+
+Check openssl doc L<https://www.openssl.org/docs/ssl/SSL_in_init.html|http://www.openssl.org/docs/ssl/SSL_in_init.html>
+
 =item * get_state
+
+B<COMPATIBILITY:> OpenSSL 1.1.0 and later use different constants which are not made available. Use is_init_finished() and related functions instead.
 
 Returns the SSL connection state.
 
@@ -8978,10 +8993,10 @@ is implemented.
 The high level API functions use a global file handle C<SSLCAT_S>
 internally. This really should not be a problem because there is no
 way to interleave the high level API functions, unless you use threads
-(but threads are not very well supported in perl anyway (as of version
-5.6.1). However, you may run into problems if you call undocumented
-internal functions in an interleaved fashion. The best solution is to "require Net::SSLeay"
-in one thread after all the threads have been created.
+(but threads are not very well supported in perl anyway). However, you
+may run into problems if you call undocumented internal functions in an
+interleaved fashion. The best solution is to "require Net::SSLeay" in
+one thread after all the threads have been created.
 
 =head1 DIAGNOSTICS
 

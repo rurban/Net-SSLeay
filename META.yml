@@ -22,8 +22,9 @@ no_index:
     - examples
 requires:
   MIME::Base64: '0'
+  perl: v5.8.1
 resources:
   bugtracker: https://rt.cpan.org/Public/Dist/Display.html?Name=net-ssleay
   license: http://dev.perl.org/licenses/
   repository: https://github.com/radiator-software/p5-net-ssleay
-version: 1.86_04
+version: 1.86_05

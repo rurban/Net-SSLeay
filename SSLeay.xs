@@ -222,6 +222,7 @@ static void TRACE(int level,char *msg,...) {
 	va_start(args,msg);
 	vsnprintf(buf,4095,msg,args);
 	warn("%s",buf);
+	va_end(args);
     }
 }
 
@@ -2471,6 +2472,49 @@ SSL_CTX_sess_set_cache_size(ctx,size)
 int
 SSL_want(s)
      SSL *              s
+
+ # OpenSSL 1.1.1 documents SSL_in_init and the related functions as
+ # returning 0 or 1. However, older versions and e.g. LibreSSL may
+ # return other values than 1 which we fold to 1.
+int
+SSL_in_before(s)
+     SSL *              s
+     CODE:
+     RETVAL = SSL_in_before(s) == 0 ? 0 : 1;
+     OUTPUT:
+     RETVAL
+
+int
+SSL_is_init_finished(s)
+     SSL *              s
+     CODE:
+     RETVAL = SSL_is_init_finished(s) == 0 ? 0 : 1;
+     OUTPUT:
+     RETVAL
+
+int
+SSL_in_init(s)
+     SSL *              s
+     CODE:
+     RETVAL = SSL_in_init(s) == 0 ? 0 : 1;
+     OUTPUT:
+     RETVAL
+
+int
+SSL_in_connect_init(s)
+     SSL *              s
+     CODE:
+     RETVAL = SSL_in_connect_init(s) == 0 ? 0 : 1;
+     OUTPUT:
+     RETVAL
+
+int
+SSL_in_accept_init(s)
+     SSL *              s
+     CODE:
+     RETVAL = SSL_in_accept_init(s) == 0 ? 0 : 1;
+     OUTPUT:
+     RETVAL
 
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
 int

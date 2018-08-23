@@ -40,7 +40,8 @@
       },
       "runtime" : {
          "requires" : {
-            "MIME::Base64" : "0"
+            "MIME::Base64" : "0",
+            "perl" : "v5.8.1"
          }
       },
       "test" : {
@@ -62,5 +63,5 @@
          "web" : "https://github.com/radiator-software/p5-net-ssleay"
       }
    },
-   "version" : "1.86_04"
+   "version" : "1.86_05"
 }

@@ -11,12 +11,13 @@
 
 package Net::SSLeay;
 
+use 5.8.1;
+
 use strict;
 use Carp;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK $AUTOLOAD $CRLF);
 use Socket;
 use Errno;
-require 5.005_000;
 
 require Exporter;
 use AutoLoader;
@@ -61,7 +62,7 @@ $Net::SSLeay::slowly = 0;
 $Net::SSLeay::random_device = '/dev/urandom';
 $Net::SSLeay::how_random = 512;
 
-$VERSION = '1.86_04'; # Version in META.yml is automatically updated
+$VERSION = '1.86_05'; # Also update $Net::SSLeay::Handle::VERSION
 @ISA = qw(Exporter);
 
 #BEWARE:
