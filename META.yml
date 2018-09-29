@@ -1,14 +1,19 @@
 ---
 abstract: 'Perl extension for using OpenSSL'
 author:
-  - 'Originally written by Sampo KellomÃ¤ki'
+  - 'Sampo KellomÃ¤ki <sampo@iki.fi>'
+  - 'Florian Ragwitz <rafl@debian.org>'
+  - 'Mike McCauley <mikem@airspayce.com>'
+  - 'Chris Novakovic <chris@chrisn.me.uk>'
+  - 'Tuure Vartiainen <vartiait@radiatorsoftware.com>'
+  - 'Heikki Vatiainen <hvn@radiatorsoftware.com>'
 build_requires:
   ExtUtils::MakeMaker: '0'
   Test::More: 0.60_01
 configure_requires:
   ExtUtils::MakeMaker: '0'
 dynamic_config: 0
-generated_by: 'ExtUtils::MakeMaker version 7.0401, CPAN::Meta::Converter version 2.150001'
+generated_by: 'ExtUtils::MakeMaker version 7.34, CPAN::Meta::Converter version 2.150010'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -22,9 +27,10 @@ no_index:
     - examples
 requires:
   MIME::Base64: '0'
-  perl: v5.8.1
+  perl: '5.008001'
 resources:
   bugtracker: https://rt.cpan.org/Public/Dist/Display.html?Name=net-ssleay
   license: http://dev.perl.org/licenses/
   repository: https://github.com/radiator-software/p5-net-ssleay
-version: 1.86_05
+version: 1.86_06
+x_serialization_backend: 'CPAN::Meta::YAML version 0.018'

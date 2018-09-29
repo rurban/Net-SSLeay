@@ -1,8 +1,11 @@
 /* SSLeay.xs - Perl module for using Eric Young's implementation of SSL
  *
- * Copyright (c) 1996-2002 Sampo Kellomaki <sampo@iki.fi>
- * Copyright (C) 2005 Florian Ragwitz <rafl@debian.org>
- * Copyright (C) 2005 Mike McCauley <mikem@airspayce.com>
+ * Copyright (c) 1996-2003 Sampo Kellomäki <sampo@iki.fi>
+ * Copyright (c) 2005-2010 Florian Ragwitz <rafl@debian.org>
+ * Copyright (c) 2005-2018 Mike McCauley <mikem@airspayce.com>
+ * Copyright (c) 2018- Chris Novakovic <chris@chrisn.me.uk>
+ * Copyright (c) 2018- Tuure Vartiainen <vartiait@radiatorsoftware.com>
+ * Copyright (c) 2018- Heikki Vatiainen <hvn@radiatorsoftware.com>
  * 
  * All Rights Reserved.
  *
@@ -250,9 +253,9 @@ UV get_my_thread_id(void) /* returns threads->tid() value */
 {
     dSP;
     UV tid = 0;
+#ifdef USE_ITHREADS
     int count = 0;
 
-#ifdef USE_ITHREADS
     ENTER;
     SAVETMPS;
     PUSHMARK(SP);
@@ -519,9 +522,13 @@ int cb_data_advanced_put(void *ptr, const char* data_name, SV* data)
 
     /* first delete already stored value */
     hv_delete(L2HV, data_name, strlen(data_name), G_DISCARD);
-    if (data!=NULL)
+    if (data!=NULL) {
         if (SvOK(data))
             hv_store(L2HV, data_name, strlen(data_name), data, 0);
+        else
+            /* we're not storing data so discard it */
+            SvREFCNT_dec(data);
+    }
 
     return 1;
 }
@@ -1568,6 +1575,71 @@ int tlsext_ticket_key_cb_invoke(
 
 #endif
 
+int ssleay_ssl_ctx_sess_new_cb_invoke(struct ssl_st *ssl, SSL_SESSION *sess)
+{
+    dSP;
+    int count, remove;
+    SSL_CTX *ctx;
+    SV *cb_func;
+
+    PR1("STARTED: ssleay_ssl_ctx_sess_new_cb_invoke\n");
+    ctx = SSL_get_SSL_CTX(ssl);
+    cb_func = cb_data_advanced_get(ctx, "ssleay_ssl_ctx_sess_new_cb!!func");
+
+    if(!SvOK(cb_func))
+        croak ("Net::SSLeay: ssleay_ssl_ctx_sess_new_cb_invoke called, but not set to point to any perl function.\n");
+
+    ENTER;
+    SAVETMPS;
+
+    PUSHMARK(sp);
+    XPUSHs(sv_2mortal(newSViv(PTR2IV(ssl))));
+    XPUSHs(sv_2mortal(newSViv(PTR2IV(sess))));
+    PUTBACK;
+
+    count = call_sv(cb_func, G_SCALAR);
+
+    SPAGAIN;
+
+    if (count != 1)
+        croak("Net::SSLeay: ssleay_ssl_ctx_sess_new_cb_invoke perl function did not return a scalar\n");
+
+    remove = POPi;
+
+    PUTBACK;
+    FREETMPS;
+    LEAVE;
+
+    return remove;
+}
+
+void ssleay_ssl_ctx_sess_remove_cb_invoke(SSL_CTX *ctx, SSL_SESSION *sess)
+{
+    dSP;
+    SV *cb_func;
+
+    PR1("STARTED: ssleay_ssl_ctx_sess_remove_cb_invoke\n");
+    cb_func = cb_data_advanced_get(ctx, "ssleay_ssl_ctx_sess_remove_cb!!func");
+
+    if(!SvOK(cb_func))
+        croak ("Net::SSLeay: ssleay_ssl_ctx_sess_remove_cb_invoke called, but not set to point to any perl function.\n");
+
+    ENTER;
+    SAVETMPS;
+
+    PUSHMARK(sp);
+    XPUSHs(sv_2mortal(newSViv(PTR2IV(ctx))));
+    XPUSHs(sv_2mortal(newSViv(PTR2IV(sess))));
+    PUTBACK;
+
+    call_sv(cb_func, G_VOID);
+
+    SPAGAIN;
+
+    PUTBACK;
+    FREETMPS;
+    LEAVE;
+}
 
 /* ============= end of callback stuff, begin helper functions ============== */
 
@@ -1707,7 +1779,11 @@ BOOT:
     /* initialize global shared callback data hash */
     MY_CXT.global_cb_data = newHV();
     MY_CXT.tid = get_my_thread_id();
-    PR3("BOOT: tid=%d my_perl=0x%p\n", MY_CXT.tid, my_perl);
+#ifdef USE_ITHREADS
+    PR3("BOOT: tid=%lu my_perl=%p\n", MY_CXT.tid, my_perl);
+#else
+    PR1("BOOT:\n");
+#endif
     }
 
 void
@@ -1721,7 +1797,11 @@ CODE:
      */
     MY_CXT.global_cb_data = newHV();
     MY_CXT.tid = get_my_thread_id();
-    PR3("CLONE: tid=%d my_perl=0x%p\n", MY_CXT.tid, my_perl);
+#ifdef USE_ITHREADS
+    PR3("CLONE: tid=%lu my_perl=%p\n", MY_CXT.tid, my_perl);
+#else
+    PR1("CLONE: but USE_ITHREADS not defined\n");
+#endif
 
 double
 constant(name)
@@ -1899,6 +1979,68 @@ SSL_CTX_set_verify(ctx,mode,callback=&PL_sv_undef)
         SSL_CTX_set_verify(ctx, mode, &ssleay_verify_callback_invoke);
     }
 
+#if OPENSSL_VERSION_NUMBER >= 0x10100001L && !defined(LIBRESSL_VERSION_NUMBER)
+
+void
+SSL_CTX_set_security_level(SSL_CTX * ctx, int level)
+
+int
+SSL_CTX_get_security_level(SSL_CTX * ctx)
+
+#endif
+
+#if OPENSSL_VERSION_NUMBER >= 0x10101007L && !defined(LIBRESSL_VERSION_NUMBER)
+
+int
+SSL_CTX_set_num_tickets(SSL_CTX *ctx, size_t num_tickets)
+
+size_t
+SSL_CTX_get_num_tickets(SSL_CTX *ctx)
+
+#endif
+
+#if OPENSSL_VERSION_NUMBER >= 0x10101003L && !defined(LIBRESSL_VERSION_NUMBER)
+
+int
+SSL_CTX_set_ciphersuites(SSL_CTX *ctx, const char *str)
+
+#endif
+
+#if OPENSSL_VERSION_NUMBER >= 0x1010100fL && !defined(LIBRESSL_VERSION_NUMBER) /* OpenSSL 1.1.1 */
+
+void
+SSL_CTX_set_post_handshake_auth(SSL_CTX *ctx, int val)
+
+#endif
+
+void
+SSL_CTX_sess_set_new_cb(ctx, callback)
+        SSL_CTX * ctx
+        SV * callback
+    CODE:
+        if (callback==NULL || !SvOK(callback)) {
+            SSL_CTX_sess_set_new_cb(ctx, NULL);
+            cb_data_advanced_put(ctx, "ssleay_ssl_ctx_sess_new_cb!!func", NULL);
+        }
+        else {
+            cb_data_advanced_put(ctx, "ssleay_ssl_ctx_sess_new_cb!!func", newSVsv(callback));
+            SSL_CTX_sess_set_new_cb(ctx, &ssleay_ssl_ctx_sess_new_cb_invoke);
+        }
+
+void
+SSL_CTX_sess_set_remove_cb(ctx, callback)
+        SSL_CTX * ctx
+        SV * callback
+    CODE:
+        if (callback==NULL || !SvOK(callback)) {
+            SSL_CTX_sess_set_remove_cb(ctx, NULL);
+            cb_data_advanced_put(ctx, "ssleay_ssl_ctx_sess_remove_cb!!func", NULL);
+        }
+        else {
+            cb_data_advanced_put(ctx, "ssleay_ssl_ctx_sess_remove_cb!!func", newSVsv(callback));
+            SSL_CTX_sess_set_remove_cb(ctx, &ssleay_ssl_ctx_sess_remove_cb_invoke);
+        }
+
 int
 SSL_get_error(s,ret)
      SSL *              s
@@ -1989,16 +2131,20 @@ int
 SSL_get_fd(s)
      SSL *   s
 
-AV *
+void
 SSL_read(s,max=32768)
 	SSL *   s
 	int     max
     PREINIT:
 	char *buf;
 	int got;
+	int succeeded = 1;
     PPCODE:
 	New(0, buf, max, char);
+
 	got = SSL_read(s, buf, max);
+	if (got <= 0 && SSL_ERROR_ZERO_RETURN != SSL_get_error(s, got))
+	       succeeded = 0;
 
 	/* If in list context, return 2-item list:
 	 *   first return value:  data gotten, or undef on error (got<0)
@@ -2006,13 +2152,13 @@ SSL_read(s,max=32768)
 	 */
 	if (GIMME_V==G_ARRAY) {
 	    EXTEND(SP, 2);
-	    PUSHs(sv_2mortal(got>=0 ? newSVpvn(buf, got) : newSV(0)));
+	    PUSHs(sv_2mortal(succeeded ? newSVpvn(buf, got) : newSV(0)));
 	    PUSHs(sv_2mortal(newSViv(got)));
 
 	/* If in scalar or void context, return data gotten, or undef on error. */
 	} else {
 	    EXTEND(SP, 1);
-	    PUSHs(sv_2mortal(got>=0 ? newSVpvn(buf, got) : newSV(0)));
+	    PUSHs(sv_2mortal(succeeded ? newSVpvn(buf, got) : newSV(0)));
 	}
 
 	Safefree(buf);
@@ -2021,13 +2167,16 @@ void
 SSL_peek(s,max=32768)
 	SSL *   s
 	int     max
-	PREINIT:
+    PREINIT:
 	char *buf;
 	int got;
-	PPCODE:
+	int succeeded = 1;
+    PPCODE:
 	New(0, buf, max, char);
 
 	got = SSL_peek(s, buf, max);
+	if (got <= 0 && SSL_ERROR_ZERO_RETURN != SSL_get_error(s, got))
+	       succeeded = 0;
 
 	/* If in list context, return 2-item list:
 	 *   first return value:  data gotten, or undef on error (got<0)
@@ -2035,15 +2184,86 @@ SSL_peek(s,max=32768)
 	 */
 	if (GIMME_V==G_ARRAY) {
 	    EXTEND(SP, 2);
-	    PUSHs(sv_2mortal(got>=0 ? newSVpvn(buf, got) : newSV(0)));
+	    PUSHs(sv_2mortal(succeeded ? newSVpvn(buf, got) : newSV(0)));
 	    PUSHs(sv_2mortal(newSViv(got)));
 	    
 	    /* If in scalar or void context, return data gotten, or undef on error. */
 	} else {
 	    EXTEND(SP, 1);
-	    PUSHs(sv_2mortal(got>=0 ? newSVpvn(buf, got) : newSV(0)));
+	    PUSHs(sv_2mortal(succeeded ? newSVpvn(buf, got) : newSV(0)));
 	}
 	Safefree(buf);
+
+#if OPENSSL_VERSION_NUMBER >= 0x1010100fL && !defined(LIBRESSL_VERSION_NUMBER) /* OpenSSL 1.1.1 */
+
+void
+SSL_read_ex(s,max=32768)
+	SSL *   s
+	int     max
+    PREINIT:
+	char *buf;
+	size_t readbytes;
+	int succeeded;
+    PPCODE:
+	Newx(buf, max, char);
+
+	succeeded = SSL_read_ex(s, buf, max, &readbytes);
+
+	/* Return 2-item list:
+	 *   first return value:  data gotten, or undef on error
+	 *   second return value: result from SSL_read_ex()
+	 */
+	EXTEND(SP, 2);
+	PUSHs(sv_2mortal(succeeded ? newSVpvn(buf, readbytes) : newSV(0)));
+	PUSHs(sv_2mortal(newSViv(succeeded)));
+
+	Safefree(buf);
+
+
+void
+SSL_peek_ex(s,max=32768)
+	SSL *   s
+	int     max
+    PREINIT:
+	char *buf;
+	size_t readbytes;
+	int succeeded;
+    PPCODE:
+	Newx(buf, max, char);
+
+	succeeded = SSL_peek_ex(s, buf, max, &readbytes);
+
+	/* Return 2-item list:
+	 *   first return value:  data gotten, or undef on error
+	 *   second return value: result from SSL_peek_ex()
+	 */
+	EXTEND(SP, 2);
+	PUSHs(sv_2mortal(succeeded ? newSVpvn(buf, readbytes) : newSV(0)));
+	PUSHs(sv_2mortal(newSViv(succeeded)));
+
+	Safefree(buf);
+
+void
+SSL_write_ex(s,buf)
+	SSL *   s
+    PREINIT:
+	STRLEN len;
+	size_t written;
+	int succeeded;
+    INPUT:
+	char *  buf = SvPV( ST(1), len);
+    PPCODE:
+	succeeded = SSL_write_ex(s, buf, len, &written);
+
+	/* Return 2-item list:
+	 *   first return value:  data gotten, or undef on error
+	 *   second return value: result from SSL_read_ex()
+	 */
+	EXTEND(SP, 2);
+	PUSHs(sv_2mortal(newSVuv(written)));
+	PUSHs(sv_2mortal(newSViv(succeeded)));
+
+#endif
 
 int
 SSL_write(s,buf)
@@ -2075,7 +2295,7 @@ SSL_write_partial(s,from,count,buf)
      } else
        buf = SvPV( ST(3), len);
        */
-     PR4("write_partial from=%d count=%d len=%ul\n",from,count,ulen);
+     PR4("write_partial from=%d count=%d len=%lu\n",from,count,ulen);
      /*PR2("buf='%s'\n",&buf[from]); / * too noisy */
      len = (IV)ulen;
      len -= from;
@@ -2210,6 +2430,14 @@ int
 SSL_pending(s)
      SSL *              s
 
+#if OPENSSL_VERSION_NUMBER >= 0x1010000fL && !defined(LIBRESSL_VERSION_NUMBER) /* OpenSSL 1.1.0 */
+
+int
+SSL_has_pending(s)
+     SSL *              s
+
+#endif
+
 int
 SSL_CTX_set_cipher_list(s,str)
      SSL_CTX *              s
@@ -2303,6 +2531,23 @@ SSL_SESSION_print(fp,ses)
 void
 SSL_SESSION_free(ses)
      SSL_SESSION *      ses
+
+#if OPENSSL_VERSION_NUMBER >= 0x10101001L && !defined(LIBRESSL_VERSION_NUMBER)
+
+int
+SSL_SESSION_is_resumable(ses)
+     SSL_SESSION *      ses
+
+#endif
+#if OPENSSL_VERSION_NUMBER >= 0x1010100fL && !defined(LIBRESSL_VERSION_NUMBER) /* OpenSSL 1.1.1 */
+
+void
+SSL_set_post_handshake_auth(SSL *ssl, int val)
+
+int
+SSL_verify_client_post_handshake(SSL *ssl)
+
+#endif
 
 int
 i2d_SSL_SESSION(in,pp)
@@ -2612,6 +2857,33 @@ SSL_set_default_passwd_cb_userdata(ssl,data=&PL_sv_undef)
 #endif /* !LibreSSL */
 #endif /* >= 1.1.0f */
 
+#if OPENSSL_VERSION_NUMBER >= 0x10100001L && !defined(LIBRESSL_VERSION_NUMBER)
+
+void
+SSL_set_security_level(SSL * ssl, int level)
+
+int
+SSL_get_security_level(SSL * ssl)
+
+#endif
+
+#if OPENSSL_VERSION_NUMBER >= 0x10101007L && !defined(LIBRESSL_VERSION_NUMBER)
+
+int
+SSL_set_num_tickets(SSL *ssl, size_t num_tickets)
+
+size_t
+SSL_get_num_tickets(SSL *ssl)
+
+#endif
+
+#if OPENSSL_VERSION_NUMBER >= 0x10101003L && !defined(LIBRESSL_VERSION_NUMBER)
+
+int
+SSL_set_ciphersuites(SSL *ssl, const char *str)
+
+#endif
+
 const BIO_METHOD *
 BIO_f_ssl()
 
@@ -2738,6 +3010,26 @@ RAND_bytes(buf, num)
         RETVAL = rc;
     OUTPUT:
         RETVAL
+
+#if OPENSSL_VERSION_NUMBER >= 0x10101001L && !defined(LIBRESSL_VERSION_NUMBER)
+
+int
+RAND_priv_bytes(buf, num)
+    SV *buf
+    int num
+    PREINIT:
+        int rc;
+        unsigned char *random;
+    CODE:
+        New(0, random, num, unsigned char);
+        rc = RAND_priv_bytes(random, num);
+        sv_setpvn(buf, (const char*)random, num);
+        Safefree(random);
+        RETVAL = rc;
+    OUTPUT:
+        RETVAL
+
+#endif
 
 int
 RAND_pseudo_bytes(buf, num)
@@ -5055,9 +5347,25 @@ int
 SSL_shutdown(s)
      SSL *	s
 
+const char *
+SSL_get_version(ssl)
+     const SSL * ssl
+
 int
 SSL_version(ssl)
      SSL *	ssl
+
+#if OPENSSL_VERSION_NUMBER >= 0x10100006L && !defined(LIBRESSL_VERSION_NUMBER) /* 1.1.0-pre6 */
+
+int
+SSL_client_version(ssl)
+     const SSL * ssl
+
+int
+SSL_is_dtls(ssl)
+     const SSL * ssl
+
+#endif
 
 #define REM_MANUALLY_ADDED_1_09
 
@@ -5723,6 +6031,7 @@ SSL_get_keyblock_size(s)
 	int md_size = -1;
 	c = s->enc_read_ctx->cipher;
 #if OPENSSL_VERSION_NUMBER >= 0x10001000L
+	h = NULL;
 	if (s->s3)
 	    md_size = s->s3->tmp.new_mac_secret_size;
 #elif OPENSSL_VERSION_NUMBER >= 0x00909000L
@@ -6982,21 +7291,28 @@ P_alpn_selected(s)
 #if OPENSSL_VERSION_NUMBER >= 0x10001000L
 
 void
-SSL_export_keying_material(ssl, outlen, label, p)
+SSL_export_keying_material(ssl, outlen, label, context=&PL_sv_undef)
         SSL * ssl
         int outlen
+        SV * context
     PREINIT:
-        char *  out;
-        STRLEN labellen;
-        STRLEN plen;
-	int ret;
+        unsigned char *  out;
+        STRLEN llen;
+        STRLEN contextlen = 0;
+        char *context_arg = NULL;
+        int use_context = 0;
+        int ret;
     INPUT:
-        char *  label = SvPV( ST(2), labellen);
-        char *  p = SvPV( ST(3), plen);
+        char *  label = SvPV( ST(2), llen);
     PPCODE:
-	New(0, out, outlen, char);
-        ret = SSL_export_keying_material(ssl, (unsigned char*)out, outlen, label, labellen, (unsigned char*)p, plen, plen ? 1 : 0);
-        PUSHs(sv_2mortal(ret>=0 ? newSVpvn(out, outlen) : newSV(0)));
+        Newx(out, outlen, unsigned char);
+
+        if (context != &PL_sv_undef) {
+            use_context = 1;
+            context_arg = SvPV( ST(3), contextlen);
+        }
+        ret = SSL_export_keying_material(ssl, out, outlen, label, llen, (unsigned char*)context_arg, contextlen, use_context);
+        PUSHs(sv_2mortal(ret>0 ? newSVpvn((const char *)out, outlen) : newSV(0)));
         EXTEND(SP, 1);
 	Safefree(out);
 

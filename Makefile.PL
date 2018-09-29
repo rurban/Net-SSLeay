@@ -22,8 +22,16 @@ my %eumm_args = (
   NAME => 'Net::SSLeay',
   ABSTRACT => 'Perl extension for using OpenSSL',
   LICENSE => 'perl',
-  AUTHOR => 'Originally written by Sampo Kellomäki',
+  AUTHOR => [
+    'Sampo Kellomäki <sampo@iki.fi>',
+    'Florian Ragwitz <rafl@debian.org>',
+    'Mike McCauley <mikem@airspayce.com>',
+    'Chris Novakovic <chris@chrisn.me.uk>',
+    'Tuure Vartiainen <vartiait@radiatorsoftware.com>',
+    'Heikki Vatiainen <hvn@radiatorsoftware.com>'
+  ],
   VERSION_FROM => 'lib/Net/SSLeay.pm',
+  MIN_PERL_VERSION => '5.8.1',
   CONFIGURE_REQUIRES => {
     'ExtUtils::MakeMaker' => '0',
   },
@@ -31,7 +39,6 @@ my %eumm_args = (
     'Test::More' => '0.60_01',
   },
   PREREQ_PM => {
-    'perl' => '5.8.1',
     'MIME::Base64' => '0',
   },
   test => { TESTS => $tests },
@@ -72,6 +79,13 @@ my %eumm_args = (
   },
   ssleay(),
 );
+
+# This can go when EU::MM older than 6.58 are gone
+$eumm_args{AUTHOR} = join(', ', @{$eumm_args{AUTHOR}}) unless eval { ExtUtils::MakeMaker->VERSION(6.58); };
+
+# This can go when EU::MM older than 6.64 are gone
+delete $eumm_args{TEST_REQUIRES} unless eval { ExtUtils::MakeMaker->VERSION(6.64); };
+
 WriteMakefile(%eumm_args);
 
 sub MY::postamble {
@@ -318,7 +332,7 @@ EOM
         exit 0; # according http://wiki.cpantesters.org/wiki/CPANAuthorNotes this is best-practice when "missing library"
     }
 
-    if ($major == 1.1 && $minor > 0) {
+    if ($major == 1.1 && $minor > 1) {
         print <<EOM;
 *** That's newer than what this module was tested with
     You should consider checking if there is a newer release of this module
