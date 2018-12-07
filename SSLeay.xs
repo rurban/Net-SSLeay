@@ -2288,19 +2288,19 @@ SSL_write_partial(s,from,count,buf)
      INPUT:
      char *  buf = SvPV( ST(3), ulen);
      CODE:
-      /*
+     /*
      if (SvROK( ST(3) )) {
        SV* t = SvRV( ST(3) );
-       buf = SvPV( t, len);
+       buf = SvPV( t, ulen);
      } else
-       buf = SvPV( ST(3), len);
-       */
+       buf = SvPV( ST(3), ulen);
+     */
      PR4("write_partial from=%d count=%d len=%lu\n",from,count,ulen);
      /*PR2("buf='%s'\n",&buf[from]); / * too noisy */
      len = (IV)ulen;
      len -= from;
      if (len < 0) {
-       croak("from beyound end of buffer");
+       croak("from beyond end of buffer");
        RETVAL = -1;
      } else
        RETVAL = SSL_write (s, &(buf[from]), (count<=len)?count:len);
